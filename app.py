@@ -13,10 +13,8 @@ def load_data():
     else:
         return {}
 
-# Funktion för att spara data till fil
+# Funktion för att spara data till fil (utan att skapa mapp)
 def save_data(data):
-    # Skapa mappen om den inte finns
-    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     with open(DATA_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -178,7 +176,6 @@ if st.button("Spara bolag"):
         }
         save_data(st.session_state.data)
         st.success(f"Bolaget '{nytt_bolagsnamn}' har sparats/uppdaterats!")
-        st.session_state.valt_bolag = nytt_bolagsnamn
         st.experimental_rerun()
 
 if st.session_state.data:
