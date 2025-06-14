@@ -15,10 +15,10 @@ def save_data(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Hantera refresh vid st.session_state["refresh"]
+# Hantera refresh via session_state
 if st.session_state.get("refresh", False):
     st.session_state["refresh"] = False
-    st.experimental_rerun()
+    st.stop()
 
 data = load_data()
 st.title("📈 Aktieanalysapp – Inmatning, analys och filtrering")
@@ -80,7 +80,7 @@ if st.button("💾 Spara bolag"):
         st.session_state["refresh"] = True
         st.stop()
 
-if val and nytt_bolagsnamn in data:
+if val och nytt_bolagsnamn in data:
     st.markdown(f"📅 Senast uppdaterad: **{data[nytt_bolagsnamn].get('senast_andrad', 'okänt')}**")
 
 # Översikt
