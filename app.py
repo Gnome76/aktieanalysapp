@@ -15,6 +15,8 @@ def load_data():
 
 # Funktion för att spara data till fil
 def save_data(data):
+    # Skapa mappen om den inte finns
+    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     with open(DATA_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
