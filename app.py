@@ -117,8 +117,6 @@ for namn, info in data.items():
         ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
 
         target_pe = info["vinst_2"] * pe_snitt
-        # Rätta target_ps till rätt formel: P/S snitt * (1 + oms_tillv_1/100 + oms_tillv_2/100)/2 * kurs ?
-        # Men enligt tidigare önskan, target P/S baserat på nästa års omsättningstillväxt – här gör vi enkel approximation:
         oms_tillv_medel = (info["oms_tillv_1"] + info["oms_tillv_2"]) / 2 / 100
         oms_next = info["oms_fjol"] * (1 + oms_tillv_medel)
         target_ps = ps_snitt * oms_next
@@ -162,4 +160,40 @@ if visningslista:
     index = st.session_state.bolag_index
     bolag = visningslista[index]
 
-    st.subheader(b
+    st.subheader(bolag["Bolag"])
+    st.write(f"Kurs: {bolag['Kurs']}")
+    st.write(f"Target P/E: {bolag['Target P/E']}")
+    st.write(f"Target P/S: {bolag['Target P/S']}")
+    st.write(f"Rabatt P/E (%): {bolag['Rabatt P/E (%)']}")
+    st.write(f"Rabatt P/S (%): {bolag['Rabatt P/S (%)']}")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("⬅️ Föregående") and index > 0:
+            st.session_state.bolag_index -= 1
+            st.session_state["refresh"] = True
+            st.stop()
+
+    with col2:
+        if st.button("Nästa ➡️") and index < len(visningslista) - 1:
+            st.session_state.bolag_index += 1
+            st.session_state["refresh"] = True
+            st.stop()
+else:
+    st.info("Inga bolag att visa i mobilvyn.")
+
+# Ta bort bolag
+st.header("🗑️ Ta bort bolag")
+
+if valda_bolag:
+    ta_bort = st.selectbox("Välj bolag att ta bort:", valda_bolag)
+    if st.button("Ta bort valt bolag"):
+        if ta_bort in data:
+            del data[ta_bort]
+            save_data(data)
+            st.success(f"Bolaget {ta_bort} har tagits bort.")
+            st.session_state["refresh"] = True
+            st.stop()
+else:
+    st.info("Inga bolag att ta bort.")
