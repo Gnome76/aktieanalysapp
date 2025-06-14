@@ -5,27 +5,23 @@ from datetime import datetime
 
 DB_FILE = "bolag_data.json"
 
-# Ladda befintlig data
 def load_data():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
             return json.load(f)
     return {}
 
-# Spara data
 def save_data(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
 data = load_data()
-st.title("📈 Aktieanalysapp – Inmatning och översikt")
+st.title("📈 Aktieanalysapp – Inmatning, analys och filtrering")
 
-# Rullista med bolag
+# Välj/redigera bolag
 valda_bolag = list(data.keys())
 val = st.selectbox("Välj ett bolag att redigera eller skriv nytt namn:", [""] + valda_bolag)
 nytt_bolagsnamn = st.text_input("Bolagsnamn", value=val if val else "")
-
-# Hämta bolagsinfo
 info = data.get(nytt_bolagsnamn, {})
 
 # Inmatningsfält
@@ -49,7 +45,7 @@ ps2 = st.number_input("P/S 2", value=info.get("ps2", 0.0), step=0.1)
 ps3 = st.number_input("P/S 3", value=info.get("ps3", 0.0), step=0.1)
 ps4 = st.number_input("P/S 4", value=info.get("ps4", 0.0), step=0.1)
 
-# Spara
+# Spara bolag
 if st.button("💾 Spara bolag"):
     if nytt_bolagsnamn.strip() == "":
         st.warning("Bolagsnamn krävs.")
@@ -79,13 +75,10 @@ if st.button("💾 Spara bolag"):
         st.session_state["refresh"] = True
         st.stop()
 
-# Visa senaste uppdatering
 if val and nytt_bolagsnamn in data:
     st.markdown(f"📅 Senast uppdaterad: **{data[nytt_bolagsnamn].get('senast_andrad', 'okänt')}**")
 
-# -------------------------
-# ÖVERSIKTSTABELL
-# -------------------------
+# Översikt
 st.header("📋 Översikt – sparade bolag")
 
 if data:
@@ -106,10 +99,10 @@ if data:
 else:
     st.info("Inga bolag sparade än.")
 
-# -------------------------
-# TARGETKURSER
-# -------------------------
-st.header("🎯 Targetkurser (baserat på nästa års nyckeltal)")
+# Targetkurser & checkboxfiltrering
+st.header("🎯 Targetkurser & värdering")
+
+visa_endast_undervard = st.checkbox("Visa endast bolag med minst 30 % rabatt", value=False)
 
 targetdata = []
 
@@ -119,7 +112,7 @@ for namn, info in data.items():
         ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
 
         target_pe = info["vinst_2"] * pe_snitt
-        target_ps = ps_snitt * info["kurs"]  # förenklad
+        target_ps = ps_snitt * info["kurs"]
 
         aktuell_kurs = info["kurs"]
         rabatt_pe = round(100 * (1 - aktuell_kurs / target_pe), 1) if target_pe else 0
@@ -136,19 +129,29 @@ for namn, info in data.items():
     except Exception as e:
         st.warning(f"Fel i beräkning för {namn}: {e}")
 
+if visa_endast_undervard:
+    targetdata = [
+        row for row in targetdata
+        if row["Rabatt P/E (%)"] >= 30 or row["Rabatt P/S (%)"] >= 30
+    ]
+
 if targetdata:
+    targetdata = sorted(targetdata, key=lambda x: min(x["Rabatt P/E (%)"], x["Rabatt P/S (%)"]), reverse=True)
     st.dataframe(targetdata, use_container_width=True)
-st.header("🔎 Undervärderade bolag (minst 30 % rabatt)")
-
-min_rabatt = 30  # Du kan ändra detta om du vill
-
-filtrerade = [
-    row for row in targetdata
-    if row["Rabatt P/E (%)"] >= min_rabatt or row["Rabatt P/S (%)"] >= min_rabatt
-]
-
-if filtrerade:
-    filtrerade = sorted(filtrerade, key=lambda x: min(x["Rabatt P/E (%)"], x["Rabatt P/S (%)"]), reverse=True)
-    st.dataframe(filtrerade, use_container_width=True)
 else:
-    st.info("Inga bolag har minst 30 % rabatt just nu.")
+    st.info("Inga bolag matchar filtreringen just nu.")
+
+# Ta bort bolag
+st.header("🗑️ Ta bort bolag")
+
+if valda_bolag:
+    bolag_att_ta_bort = st.selectbox("Välj bolag att ta bort", valda_bolag)
+    if st.button("Radera valt bolag"):
+        if bolag_att_ta_bort in data:
+            del data[bolag_att_ta_bort]
+            save_data(data)
+            st.success(f"{bolag_att_ta_bort} har raderats.")
+            st.session_state["refresh"] = True
+            st.stop()
+else:
+    st.info("Inga bolag att radera.")
