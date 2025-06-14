@@ -1,214 +1,179 @@
 import streamlit as st
-import json
-import os
 from datetime import datetime
 
-DB_FILE = "bolag_data.json"
+# Initiera datalagring i session_state
+if "data" not in st.session_state:
+    st.session_state.data = {}
 
-def load_data():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
-    return {}
+if "valt_bolag" not in st.session_state:
+    st.session_state.valt_bolag = None
 
-def save_data(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+st.title("Aktieanalysapp - Inmatning & Redigering")
 
-# Initiera session_state variabler
-if "refresh" not in st.session_state:
-    st.session_state["refresh"] = False
-if "bolag_index" not in st.session_state:
-    st.session_state["bolag_index"] = 0
+# Välj bolag att redigera eller skapa nytt
+valda_bolag = list(st.session_state.data.keys())
+valda_bolag.insert(0, "-- Lägg till nytt bolag --")
+valt = st.selectbox("Välj bolag att redigera", valda_bolag)
 
-if st.session_state["refresh"]:
-    st.session_state["refresh"] = False
-    st.stop()
+if valt == "-- Lägg till nytt bolag --":
+    nytt_bolagsnamn = st.text_input("Bolagsnamn", value="")
+    valt_bolag_data = None
+else:
+    nytt_bolagsnamn = valt
+    valt_bolag_data = st.session_state.data.get(valt, {})
 
-data = load_data()
+# Dela in i två kolumner för huvudfält
+col1, col2 = st.columns(2)
 
-st.title("📈 Aktieanalysapp")
+with col1:
+    nuvarande_kurs = st.number_input(
+        "Nuvarande kurs",
+        value=valt_bolag_data.get("nuvarande_kurs", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    vinst_fora_aret = st.number_input(
+        "Vinst förra året",
+        value=valt_bolag_data.get("vinst_fora_aret", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    vinst_i_ar = st.number_input(
+        "Förväntad vinst i år",
+        value=valt_bolag_data.get("vinst_i_ar", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    vinst_nasta_ar = st.number_input(
+        "Förväntad vinst nästa år",
+        value=valt_bolag_data.get("vinst_nasta_ar", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
 
-# --- Inmatning / redigering ---
+with col2:
+    omsattning_fora_aret = st.number_input(
+        "Omsättning förra året",
+        value=valt_bolag_data.get("omsattning_fora_aret", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    omsattningstillvaxt_ar = st.number_input(
+        "Förväntad omsättningstillväxt i år %",
+        value=valt_bolag_data.get("omsattningstillvaxt_ar", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    omsattningstillvaxt_nasta_ar = st.number_input(
+        "Förväntad omsättningstillväxt nästa år %",
+        value=valt_bolag_data.get("omsattningstillvaxt_nasta_ar", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    nuvarande_pe = st.number_input(
+        "Nuvarande P/E",
+        value=valt_bolag_data.get("nuvarande_pe", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
 
-valda_bolag = list(data.keys())
-val = st.selectbox("Välj ett bolag att redigera eller skriv nytt namn:", [""] + valda_bolag)
-nytt_bolagsnamn = st.text_input("Bolagsnamn", value=val if val else "")
+with st.expander("Övriga P/E och P/S värden"):
+    pe1 = st.number_input(
+        "P/E 1",
+        value=valt_bolag_data.get("pe1", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    pe2 = st.number_input(
+        "P/E 2",
+        value=valt_bolag_data.get("pe2", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    pe3 = st.number_input(
+        "P/E 3",
+        value=valt_bolag_data.get("pe3", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    pe4 = st.number_input(
+        "P/E 4",
+        value=valt_bolag_data.get("pe4", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
 
-info = data.get(nytt_bolagsnamn, {}) if nytt_bolagsnamn else {}
+    nuvarande_ps = st.number_input(
+        "Nuvarande P/S",
+        value=valt_bolag_data.get("nuvarande_ps", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    ps1 = st.number_input(
+        "P/S 1",
+        value=valt_bolag_data.get("ps1", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    ps2 = st.number_input(
+        "P/S 2",
+        value=valt_bolag_data.get("ps2", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    ps3 = st.number_input(
+        "P/S 3",
+        value=valt_bolag_data.get("ps3", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
+    ps4 = st.number_input(
+        "P/S 4",
+        value=valt_bolag_data.get("ps4", 0.0) if valt_bolag_data else 0.0,
+        format="%.2f",
+        step=0.01,
+    )
 
-kurs = st.number_input("Nuvarande kurs", value=info.get("kurs", 0.0), step=0.01)
-vinst_fjol = st.number_input("Vinst förra året", value=info.get("vinst_fjol", 0.0), step=0.01)
-vinst_1 = st.number_input("Förväntad vinst i år", value=info.get("vinst_1", 0.0), step=0.01)
-vinst_2 = st.number_input("Förväntad vinst nästa år", value=info.get("vinst_2", 0.0), step=0.01)
-oms_fjol = st.number_input("Omsättning förra året", value=info.get("oms_fjol", 0.0), step=0.01)
-oms_tillv_1 = st.number_input("Omsättningstillväxt i år (%)", value=info.get("oms_tillv_1", 0.0), step=0.1)
-oms_tillv_2 = st.number_input("Omsättningstillväxt nästa år (%)", value=info.get("oms_tillv_2", 0.0), step=0.1)
+# Datum som sätts vid sparande
+datum_nu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-pe_nu = st.number_input("Nuvarande P/E", value=info.get("pe_nu", 0.0), step=0.1)
-pe1 = st.number_input("P/E 1", value=info.get("pe1", 0.0), step=0.1)
-pe2 = st.number_input("P/E 2", value=info.get("pe2", 0.0), step=0.1)
-pe3 = st.number_input("P/E 3", value=info.get("pe3", 0.0), step=0.1)
-pe4 = st.number_input("P/E 4", value=info.get("pe4", 0.0), step=0.1)
-
-ps_nu = st.number_input("Nuvarande P/S", value=info.get("ps_nu", 0.0), step=0.1)
-ps1 = st.number_input("P/S 1", value=info.get("ps1", 0.0), step=0.1)
-ps2 = st.number_input("P/S 2", value=info.get("ps2", 0.0), step=0.1)
-ps3 = st.number_input("P/S 3", value=info.get("ps3", 0.0), step=0.1)
-ps4 = st.number_input("P/S 4", value=info.get("ps4", 0.0), step=0.1)
-
-if st.button("💾 Spara bolag"):
+if st.button("Spara bolag"):
     if nytt_bolagsnamn.strip() == "":
-        st.warning("Bolagsnamn krävs.")
+        st.error("Ange ett giltigt bolagsnamn!")
     else:
-        data[nytt_bolagsnamn] = {
-            "kurs": kurs,
-            "vinst_fjol": vinst_fjol,
-            "vinst_1": vinst_1,
-            "vinst_2": vinst_2,
-            "oms_fjol": oms_fjol,
-            "oms_tillv_1": oms_tillv_1,
-            "oms_tillv_2": oms_tillv_2,
-            "pe_nu": pe_nu,
+        st.session_state.data[nytt_bolagsnamn] = {
+            "nuvarande_kurs": nuvarande_kurs,
+            "vinst_fora_aret": vinst_fora_aret,
+            "vinst_i_ar": vinst_i_ar,
+            "vinst_nasta_ar": vinst_nasta_ar,
+            "omsattning_fora_aret": omsattning_fora_aret,
+            "omsattningstillvaxt_ar": omsattningstillvaxt_ar,
+            "omsattningstillvaxt_nasta_ar": omsattningstillvaxt_nasta_ar,
+            "nuvarande_pe": nuvarande_pe,
             "pe1": pe1,
             "pe2": pe2,
             "pe3": pe3,
             "pe4": pe4,
-            "ps_nu": ps_nu,
+            "nuvarande_ps": nuvarande_ps,
             "ps1": ps1,
             "ps2": ps2,
             "ps3": ps3,
             "ps4": ps4,
-            "senast_andrad": datetime.now().strftime("%Y-%m-%d %H:%M")
+            "senast_andrad": datum_nu,
         }
-        save_data(data)
-        st.success(f"Bolaget '{nytt_bolagsnamn}' har sparats!")
-        st.session_state["refresh"] = True
-        st.stop()
+        st.success(f"Bolaget '{nytt_bolagsnamn}' har sparats/uppdaterats!")
 
-if nytt_bolagsnamn and nytt_bolagsnamn in data:
-    st.markdown(f"📅 Senast uppdaterad: **{data[nytt_bolagsnamn].get('senast_andrad', 'okänt')}**")
+        # Sätt valt bolag till det nya/uppdaterade så att UI reflekterar rätt
+        st.session_state.valt_bolag = nytt_bolagsnamn
 
-st.markdown("---")
+# Visa sparade bolag i tabell
+if st.session_state.data:
+    st.subheader("Sparade bolag")
+    import pandas as pd
 
-# --- Översikt ---
+    df = pd.DataFrame.from_dict(st.session_state.data, orient="index")
+    df.index.name = "Bolagsnamn"
+    st.dataframe(df)
 
-st.header("📋 Översikt – sparade bolag")
-
-if data:
-    tabell = []
-    for namn, info in data.items():
-        pe_snitt = sum([info.get(f"pe{i}", 0) for i in range(1, 5)]) / 4
-        ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
-        tabell.append({
-            "Bolag": namn,
-            "Kurs": info["kurs"],
-            "Vinst 1": info["vinst_1"],
-            "Vinst 2": info["vinst_2"],
-            "Oms tillv 1 (%)": info["oms_tillv_1"],
-            "Oms tillv 2 (%)": info["oms_tillv_2"],
-            "P/E snitt": round(pe_snitt, 2),
-            "P/S snitt": round(ps_snitt, 2),
-            "Uppdaterad": info.get("senast_andrad", "")
-        })
-    st.dataframe(tabell, use_container_width=True)
 else:
     st.info("Inga bolag sparade än.")
-
-st.markdown("---")
-
-# --- Targetkurser och filter ---
-
-st.header("🎯 Targetkurser & värdering")
-
-visa_endast_undervard = st.checkbox("Visa endast bolag med minst 30 % rabatt", value=False)
-
-targetdata = []
-for namn, info in data.items():
-    try:
-        pe_snitt = sum([info.get(f"pe{i}", 0) for i in range(1, 5)]) / 4
-        ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
-
-        target_pe = info["vinst_2"] * pe_snitt
-        oms_tillv_medel = (info["oms_tillv_1"] + info["oms_tillv_2"]) / 2 / 100
-        oms_next = info["oms_fjol"] * (1 + oms_tillv_medel)
-        target_ps = ps_snitt * oms_next
-
-        aktuell_kurs = info["kurs"]
-        rabatt_pe = round(100 * (1 - aktuell_kurs / target_pe), 1) if target_pe else 0
-        rabatt_ps = round(100 * (1 - aktuell_kurs / target_ps), 1) if target_ps else 0
-
-        targetdata.append({
-            "Bolag": namn,
-            "Kurs": aktuell_kurs,
-            "Target P/E": round(target_pe, 2),
-            "Target P/S": round(target_ps, 2),
-            "Rabatt P/E (%)": rabatt_pe,
-            "Rabatt P/S (%)": rabatt_ps,
-        })
-    except Exception as e:
-        st.warning(f"Fel i beräkning för {namn}: {e}")
-
-if visa_endast_undervard:
-    targetdata = [
-        row for row in targetdata
-        if row["Rabatt P/E (%)"] >= 30 or row["Rabatt P/S (%)"] >= 30
-    ]
-
-if targetdata:
-    targetdata = sorted(targetdata, key=lambda x: min(x["Rabatt P/E (%)"], x["Rabatt P/S (%)"]), reverse=True)
-    st.dataframe(targetdata, use_container_width=True)
-else:
-    st.info("Inga bolag matchar filtreringen just nu.")
-
-st.markdown("---")
-
-# --- Mobilvy (ett bolag i taget) ---
-
-st.header("📱 Mobilvy – visa ett bolag i taget")
-
-visningslista = targetdata.copy()
-
-if visningslista:
-    index = st.session_state.bolag_index
-    bolag = visningslista[index]
-
-    st.subheader(bolag["Bolag"])
-    st.write(f"Kurs: {bolag['Kurs']}")
-    st.write(f"Target P/E: {bolag['Target P/E']}")
-    st.write(f"Target P/S: {bolag['Target P/S']}")
-    st.write(f"Rabatt P/E (%): {bolag['Rabatt P/E (%)']}")
-    st.write(f"Rabatt P/S (%): {bolag['Rabatt P/S (%)']}")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("⬅ Föregående"):
-            st.session_state.bolag_index = (index - 1) % len(visningslista)
-            st.session_state["refresh"] = True
-            st.stop()
-    with col2:
-        st.write(f"Bolag {index + 1} av {len(visningslista)}")
-    with col3:
-        if st.button("Nästa ➡"):
-            st.session_state.bolag_index = (index + 1) % len(visningslista)
-            st.session_state["refresh"] = True
-            st.stop()
-else:
-    st.info("Ingen data att visa i mobilvyn.")
-
-# --- Ta bort bolag ---
-
-st.markdown("---")
-st.header("🗑️ Ta bort bolag")
-
-if data:
-    ta_bort = st.selectbox("Välj bolag att ta bort", [""] + list(data.keys()))
-    if ta_bort:
-        if st.button(f"Ta bort {ta_bort}"):
-            data.pop(ta_bort)
-            save_data(data)
-            st.success(f"Bolaget '{ta_bort}' togs bort.")
-            st.session_state["refresh"] = True
-            st.stop()
-else:
-    st.info("Inga bolag att ta bort.")
