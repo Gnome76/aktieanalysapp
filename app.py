@@ -15,6 +15,11 @@ def save_data(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+# Hantera refresh vid st.session_state["refresh"]
+if st.session_state.get("refresh", False):
+    st.session_state["refresh"] = False
+    st.experimental_rerun()
+
 data = load_data()
 st.title("📈 Aktieanalysapp – Inmatning, analys och filtrering")
 
@@ -112,7 +117,11 @@ for namn, info in data.items():
         ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
 
         target_pe = info["vinst_2"] * pe_snitt
-        target_ps = ps_snitt * info["kurs"]
+        # Rätta target_ps till rätt formel: P/S snitt * (1 + oms_tillv_1/100 + oms_tillv_2/100)/2 * kurs ?
+        # Men enligt tidigare önskan, target P/S baserat på nästa års omsättningstillväxt – här gör vi enkel approximation:
+        oms_tillv_medel = (info["oms_tillv_1"] + info["oms_tillv_2"]) / 2 / 100
+        oms_next = info["oms_fjol"] * (1 + oms_tillv_medel)
+        target_ps = ps_snitt * oms_next
 
         aktuell_kurs = info["kurs"]
         rabatt_pe = round(100 * (1 - aktuell_kurs / target_pe), 1) if target_pe else 0
@@ -153,34 +162,4 @@ if visningslista:
     index = st.session_state.bolag_index
     bolag = visningslista[index]
 
-    st.subheader(bolag["Bolag"])
-    st.metric("Aktuell kurs", f"{bolag['Kurs']:.2f} kr")
-    st.metric("Target P/E", f"{bolag['Target P/E']:.2f} kr", delta=f"{bolag['Rabatt P/E (%)']:.1f}% rabatt")
-    st.metric("Target P/S", f"{bolag['Target P/S']:.2f} kr", delta=f"{bolag['Rabatt P/S (%)']:.1f}% rabatt")
-
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("⬅️ Föregående", use_container_width=True) and index > 0:
-            st.session_state.bolag_index -= 1
-            st.experimental_rerun()
-    with col2:
-        if st.button("Nästa ➡️", use_container_width=True) and index < len(visningslista) - 1:
-            st.session_state.bolag_index += 1
-            st.experimental_rerun()
-else:
-    st.info("Inget bolag att visa här.")
-
-# Ta bort bolag
-st.header("🗑️ Ta bort bolag")
-
-if valda_bolag:
-    bolag_att_ta_bort = st.selectbox("Välj bolag att ta bort", valda_bolag)
-    if st.button("Radera valt bolag"):
-        if bolag_att_ta_bort in data:
-            del data[bolag_att_ta_bort]
-            save_data(data)
-            st.success(f"{bolag_att_ta_bort} har raderats.")
-            st.session_state["refresh"] = True
-            st.stop()
-else:
-    st.info("Inga bolag att radera.")
+    st.subheader(b
