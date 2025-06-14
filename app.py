@@ -83,3 +83,22 @@ if st.button("💾 Spara bolag"):
 # Visa datum om bolag är valt
 if val and nytt_bolagsnamn in data:
     st.markdown(f"📅 Senast uppdaterad: **{data[nytt_bolagsnamn].get('senast_andrad', 'okänt')}**")
+st.header("📋 Översikt – sparade bolag")
+
+if data:
+    tabell = []
+    for namn, info in data.items():
+        tabell.append({
+            "Bolag": namn,
+            "Kurs": info["kurs"],
+            "Vinst 1": info["vinst_1"],
+            "Vinst 2": info["vinst_2"],
+            "Omsättningstillväxt 1 (%)": info["oms_tillv_1"],
+            "Omsättningstillväxt 2 (%)": info["oms_tillv_2"],
+            "P/E snitt": round(sum([info.get(f"pe{i}", 0) for i in range(1, 5)]) / 4, 2),
+            "P/S snitt": round(sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4, 2),
+            "Senast ändrad": info.get("senast_andrad", "")
+        })
+    st.dataframe(tabell, use_container_width=True)
+else:
+    st.info("Inga bolag sparade än.")
