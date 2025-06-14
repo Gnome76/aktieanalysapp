@@ -176,4 +176,39 @@ if visningslista:
     st.subheader(bolag["Bolag"])
     st.write(f"Kurs: {bolag['Kurs']}")
     st.write(f"Target P/E: {bolag['Target P/E']}")
-    st.write(f"Target P/S:
+    st.write(f"Target P/S: {bolag['Target P/S']}")
+    st.write(f"Rabatt P/E (%): {bolag['Rabatt P/E (%)']}")
+    st.write(f"Rabatt P/S (%): {bolag['Rabatt P/S (%)']}")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("⬅ Föregående"):
+            st.session_state.bolag_index = (index - 1) % len(visningslista)
+            st.session_state["refresh"] = True
+            st.stop()
+    with col2:
+        st.write(f"Bolag {index + 1} av {len(visningslista)}")
+    with col3:
+        if st.button("Nästa ➡"):
+            st.session_state.bolag_index = (index + 1) % len(visningslista)
+            st.session_state["refresh"] = True
+            st.stop()
+else:
+    st.info("Ingen data att visa i mobilvyn.")
+
+# --- Ta bort bolag ---
+
+st.markdown("---")
+st.header("🗑️ Ta bort bolag")
+
+if data:
+    ta_bort = st.selectbox("Välj bolag att ta bort", [""] + list(data.keys()))
+    if ta_bort:
+        if st.button(f"Ta bort {ta_bort}"):
+            data.pop(ta_bort)
+            save_data(data)
+            st.success(f"Bolaget '{ta_bort}' togs bort.")
+            st.session_state["refresh"] = True
+            st.stop()
+else:
+    st.info("Inga bolag att ta bort.")
