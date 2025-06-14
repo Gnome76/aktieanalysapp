@@ -3,15 +3,17 @@ import json
 import os
 from datetime import datetime
 
-# Hantera uppdaterings-flagg i session_state
+# Initiera refresh-flagg
 if "refresh" not in st.session_state:
     st.session_state["refresh"] = False
 
+# Om refresh är satt, "starta om" appen en gång
 if st.session_state["refresh"]:
     st.session_state["refresh"] = False
-    st.experimental_rerun()
+    # Ingen experimental_rerun, vi stoppar här och låter appen ritas om
+    st.stop()
 
-# Välj rätt databasväg beroende på miljö
+# Filväg för datalagring
 if os.path.exists("/mnt/data") and os.access("/mnt/data", os.W_OK):
     DATA_PATH = "/mnt/data/bolag.json"
 else:
@@ -31,6 +33,7 @@ def save_data(data):
     with open(DATA_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
+# Ladda data vid start
 if "data" not in st.session_state:
     st.session_state.data = load_data()
 
