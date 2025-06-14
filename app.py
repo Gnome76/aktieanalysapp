@@ -39,7 +39,7 @@ def calculate_targets(df):
     df['max_undervardering'] = df[['undervardering_pe_pct', 'undervardering_ps_pct']].max(axis=1)
 
     return df
-   def bolagsform(st_session_state):
+def bolagsform(st_session_state):
     st.header("Lägg till / Redigera bolag")
 
     if "data" not in st_session_state:
@@ -134,7 +134,7 @@ def calculate_targets(df):
 
         save_data(df)
         st_session_state.data = df
-        st.success(f"Bolaget '{bolagsnamn}' sparat/uppdaterat!")
+        st.success(f"Bolaget '{bolagsnamn}' sparat/uppdaterat!")    
 def visa_och_ta_bort_bolag(st_session_state):
     st.header("Översikt över sparade bolag")
 
@@ -157,7 +157,7 @@ def visa_och_ta_bort_bolag(st_session_state):
         save_data(df)
         st_session_state.data = df
         st.success(f"Bolaget '{ta_bort_bolag}' har tagits bort.")
-    def main():
+ def main():
     st.set_page_config(page_title="Aktieanalysapp", layout="centered")
 
     if "data" not in st.session_state:
@@ -178,4 +178,4 @@ def visa_och_ta_bort_bolag(st_session_state):
         visa_och_ta_bort_bolag(st.session_state)
 
 if __name__ == "__main__":
-    main()    
+    main()       
