@@ -3,13 +3,19 @@ import json
 import os
 from datetime import datetime
 
+# Hantera uppdaterings-flagg i session_state
+if "refresh" not in st.session_state:
+    st.session_state["refresh"] = False
+
+if st.session_state["refresh"]:
+    st.session_state["refresh"] = False
+    st.experimental_rerun()
+
 # Välj rätt databasväg beroende på miljö
 if os.path.exists("/mnt/data") and os.access("/mnt/data", os.W_OK):
     DATA_PATH = "/mnt/data/bolag.json"
-    st.write("Sparar data i /mnt/data")
 else:
     DATA_PATH = "/tmp/bolag.json"
-    st.write("Sparar data i /tmp")
 
 def load_data():
     if os.path.exists(DATA_PATH):
@@ -19,18 +25,15 @@ def load_data():
         return {}
 
 def save_data(data):
-    # Skapar katalog om den inte finns
     dir_path = os.path.dirname(DATA_PATH)
     if dir_path and not os.path.exists(dir_path):
         os.makedirs(dir_path)
     with open(DATA_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
-# Initiera session_state
 if "data" not in st.session_state:
     st.session_state.data = load_data()
 
-# Funktion för att lägga till eller uppdatera bolag
 def add_or_update_bolag(namn, kurs, v_fj, v_i_a, v_n_a, o_fj, o_i_a_pct, o_n_a_pct,
                        p_e_nu, p_e_1, p_e_2, p_e_3, p_e_4,
                        p_s_nu, p_s_1, p_s_2, p_s_3, p_s_4):
@@ -60,7 +63,6 @@ def add_or_update_bolag(namn, kurs, v_fj, v_i_a, v_n_a, o_fj, o_i_a_pct, o_n_a_p
 
 st.title("Aktieanalysapp - Inmatning av bolag")
 
-# Form för inmatning
 with st.form("bolag_form"):
     namn = st.text_input("Bolagsnamn")
     kurs = st.number_input("Nuvarande kurs", min_value=0.0, format="%.2f")
@@ -91,10 +93,11 @@ with st.form("bolag_form"):
                 p_e_nu, p_e_1, p_e_2, p_e_3, p_e_4,
                 p_s_nu, p_s_1, p_s_2, p_s_3, p_s_4
             )
+            st.session_state["refresh"] = True
+            st.stop()
 
 st.markdown("---")
 
-# Välj bolag från rullista
 val = st.selectbox("Välj bolag att visa/ändra", options=[""] + list(st.session_state.data.keys()))
 
 if val:
@@ -103,9 +106,9 @@ if val:
     for nyckel, varde in bolag.items():
         st.write(f"{nyckel}: {varde}")
 
-    # Ta bort-knapp
     if st.button(f"Ta bort {val}"):
         del st.session_state.data[val]
         save_data(st.session_state.data)
         st.success(f"Bolag '{val}' borttaget.")
-        st.experimental_rerun()
+        st.session_state["refresh"] = True
+        st.stop()
