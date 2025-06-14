@@ -5,28 +5,27 @@ from datetime import datetime
 
 DB_FILE = "bolag_data.json"
 
-# Ladda befintlig data eller skapa tom
+# Ladda befintlig data
 def load_data():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
             return json.load(f)
     return {}
 
-# Spara data till fil
+# Spara data
 def save_data(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-# Initialladdning
 data = load_data()
-st.title("📈 Aktieinmatning")
+st.title("📈 Aktieanalysapp – Inmatning och översikt")
 
-# Lista med befintliga bolag
+# Rullista med bolag
 valda_bolag = list(data.keys())
 val = st.selectbox("Välj ett bolag att redigera eller skriv nytt namn:", [""] + valda_bolag)
 nytt_bolagsnamn = st.text_input("Bolagsnamn", value=val if val else "")
 
-# Om ett bolag väljs, fyll i formuläret
+# Hämta bolagsinfo
 info = data.get(nytt_bolagsnamn, {})
 
 # Inmatningsfält
@@ -50,7 +49,7 @@ ps2 = st.number_input("P/S 2", value=info.get("ps2", 0.0), step=0.1)
 ps3 = st.number_input("P/S 3", value=info.get("ps3", 0.0), step=0.1)
 ps4 = st.number_input("P/S 4", value=info.get("ps4", 0.0), step=0.1)
 
-# Spara-knapp
+# Spara
 if st.button("💾 Spara bolag"):
     if nytt_bolagsnamn.strip() == "":
         st.warning("Bolagsnamn krävs.")
@@ -80,9 +79,13 @@ if st.button("💾 Spara bolag"):
         st.session_state["refresh"] = True
         st.stop()
 
-# Visa datum om bolag är valt
+# Visa senaste uppdatering
 if val and nytt_bolagsnamn in data:
     st.markdown(f"📅 Senast uppdaterad: **{data[nytt_bolagsnamn].get('senast_andrad', 'okänt')}**")
+
+# -------------------------
+# ÖVERSIKTSTABELL
+# -------------------------
 st.header("📋 Översikt – sparade bolag")
 
 if data:
@@ -93,12 +96,45 @@ if data:
             "Kurs": info["kurs"],
             "Vinst 1": info["vinst_1"],
             "Vinst 2": info["vinst_2"],
-            "Omsättningstillväxt 1 (%)": info["oms_tillv_1"],
-            "Omsättningstillväxt 2 (%)": info["oms_tillv_2"],
+            "Oms tillv 1 (%)": info["oms_tillv_1"],
+            "Oms tillv 2 (%)": info["oms_tillv_2"],
             "P/E snitt": round(sum([info.get(f"pe{i}", 0) for i in range(1, 5)]) / 4, 2),
             "P/S snitt": round(sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4, 2),
-            "Senast ändrad": info.get("senast_andrad", "")
+            "Uppdaterad": info.get("senast_andrad", "")
         })
     st.dataframe(tabell, use_container_width=True)
 else:
     st.info("Inga bolag sparade än.")
+
+# -------------------------
+# TARGETKURSER
+# -------------------------
+st.header("🎯 Targetkurser (baserat på nästa års nyckeltal)")
+
+targetdata = []
+
+for namn, info in data.items():
+    try:
+        pe_snitt = sum([info.get(f"pe{i}", 0) for i in range(1, 5)]) / 4
+        ps_snitt = sum([info.get(f"ps{i}", 0) for i in range(1, 5)]) / 4
+
+        target_pe = info["vinst_2"] * pe_snitt
+        target_ps = ps_snitt * info["kurs"]  # förenklad
+
+        aktuell_kurs = info["kurs"]
+        rabatt_pe = round(100 * (1 - aktuell_kurs / target_pe), 1) if target_pe else 0
+        rabatt_ps = round(100 * (1 - aktuell_kurs / target_ps), 1) if target_ps else 0
+
+        targetdata.append({
+            "Bolag": namn,
+            "Kurs": aktuell_kurs,
+            "Target P/E": round(target_pe, 2),
+            "Target P/S": round(target_ps, 2),
+            "Rabatt P/E (%)": rabatt_pe,
+            "Rabatt P/S (%)": rabatt_ps,
+        })
+    except Exception as e:
+        st.warning(f"Fel i beräkning för {namn}: {e}")
+
+if targetdata:
+    st.dataframe(targetdata, use_container_width=True)
