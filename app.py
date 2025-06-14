@@ -141,6 +141,35 @@ if targetdata:
 else:
     st.info("Inga bolag matchar filtreringen just nu.")
 
+# Mobilvy ett bolag i taget
+st.header("📱 Enkelt bolag-i-taget-läge")
+
+visningslista = targetdata.copy()
+
+if visningslista:
+    if "bolag_index" not in st.session_state:
+        st.session_state.bolag_index = 0
+
+    index = st.session_state.bolag_index
+    bolag = visningslista[index]
+
+    st.subheader(bolag["Bolag"])
+    st.metric("Aktuell kurs", f"{bolag['Kurs']:.2f} kr")
+    st.metric("Target P/E", f"{bolag['Target P/E']:.2f} kr", delta=f"{bolag['Rabatt P/E (%)']:.1f}% rabatt")
+    st.metric("Target P/S", f"{bolag['Target P/S']:.2f} kr", delta=f"{bolag['Rabatt P/S (%)']:.1f}% rabatt")
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("⬅️ Föregående", use_container_width=True) and index > 0:
+            st.session_state.bolag_index -= 1
+            st.experimental_rerun()
+    with col2:
+        if st.button("Nästa ➡️", use_container_width=True) and index < len(visningslista) - 1:
+            st.session_state.bolag_index += 1
+            st.experimental_rerun()
+else:
+    st.info("Inget bolag att visa här.")
+
 # Ta bort bolag
 st.header("🗑️ Ta bort bolag")
 
