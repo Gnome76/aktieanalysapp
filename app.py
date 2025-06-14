@@ -157,7 +157,7 @@ def visa_och_ta_bort_bolag(st_session_state):
         save_data(df)
         st_session_state.data = df
         st.success(f"Bolaget '{ta_bort_bolag}' har tagits bort.")
- def main():
+def main():
     st.set_page_config(page_title="Aktieanalysapp", layout="centered")
 
     if "data" not in st.session_state:
