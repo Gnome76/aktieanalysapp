@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-DATA_PATH = "/app/data.json"  # skrivbar mapp i streamlitcloud
+DATA_PATH = "/tmp/data.json"  # skrivbar mapp i streamlitcloud
 
 def load_data():
     if os.path.exists(DATA_PATH):
