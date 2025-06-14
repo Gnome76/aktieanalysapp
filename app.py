@@ -138,3 +138,17 @@ for namn, info in data.items():
 
 if targetdata:
     st.dataframe(targetdata, use_container_width=True)
+st.header("🔎 Undervärderade bolag (minst 30 % rabatt)")
+
+min_rabatt = 30  # Du kan ändra detta om du vill
+
+filtrerade = [
+    row for row in targetdata
+    if row["Rabatt P/E (%)"] >= min_rabatt or row["Rabatt P/S (%)"] >= min_rabatt
+]
+
+if filtrerade:
+    filtrerade = sorted(filtrerade, key=lambda x: min(x["Rabatt P/E (%)"], x["Rabatt P/S (%)"]), reverse=True)
+    st.dataframe(filtrerade, use_container_width=True)
+else:
+    st.info("Inga bolag har minst 30 % rabatt just nu.")
