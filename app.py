@@ -1,9 +1,26 @@
 import streamlit as st
 from datetime import datetime
+import json
+import os
 
-# Initiera datalagring i session_state
+DATA_PATH = "/mnt/data/bolag.json"
+
+# Funktion för att läsa data från fil
+def load_data():
+    if os.path.exists(DATA_PATH):
+        with open(DATA_PATH, "r") as f:
+            return json.load(f)
+    else:
+        return {}
+
+# Funktion för att spara data till fil
+def save_data(data):
+    with open(DATA_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+# Läs in data vid start
 if "data" not in st.session_state:
-    st.session_state.data = {}
+    st.session_state.data = load_data()
 
 if "valt_bolag" not in st.session_state:
     st.session_state.valt_bolag = None
@@ -22,7 +39,7 @@ else:
     nytt_bolagsnamn = valt
     valt_bolag_data = st.session_state.data.get(valt, {})
 
-# Dela in i två kolumner för huvudfält
+# Två kolumner för inmatning
 col1, col2 = st.columns(2)
 
 with col1:
@@ -50,8 +67,6 @@ with col1:
         format="%.2f",
         step=0.01,
     )
-
-with col2:
     omsattning_fora_aret = st.number_input(
         "Omsättning förra året",
         value=valt_bolag_data.get("omsattning_fora_aret", 0.0) if valt_bolag_data else 0.0,
@@ -64,6 +79,8 @@ with col2:
         format="%.2f",
         step=0.01,
     )
+
+with col2:
     omsattningstillvaxt_nasta_ar = st.number_input(
         "Förväntad omsättningstillväxt nästa år %",
         value=valt_bolag_data.get("omsattningstillvaxt_nasta_ar", 0.0) if valt_bolag_data else 0.0,
@@ -76,8 +93,6 @@ with col2:
         format="%.2f",
         step=0.01,
     )
-
-with st.expander("Övriga P/E och P/S värden"):
     pe1 = st.number_input(
         "P/E 1",
         value=valt_bolag_data.get("pe1", 0.0) if valt_bolag_data else 0.0,
@@ -102,7 +117,6 @@ with st.expander("Övriga P/E och P/S värden"):
         format="%.2f",
         step=0.01,
     )
-
     nuvarande_ps = st.number_input(
         "Nuvarande P/S",
         value=valt_bolag_data.get("nuvarande_ps", 0.0) if valt_bolag_data else 0.0,
@@ -134,7 +148,6 @@ with st.expander("Övriga P/E och P/S värden"):
         step=0.01,
     )
 
-# Datum som sätts vid sparande
 datum_nu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 if st.button("Spara bolag"):
@@ -161,12 +174,11 @@ if st.button("Spara bolag"):
             "ps4": ps4,
             "senast_andrad": datum_nu,
         }
+        save_data(st.session_state.data)
         st.success(f"Bolaget '{nytt_bolagsnamn}' har sparats/uppdaterats!")
-
-        # Sätt valt bolag till det nya/uppdaterade så att UI reflekterar rätt
         st.session_state.valt_bolag = nytt_bolagsnamn
+        st.experimental_rerun()
 
-# Visa sparade bolag i tabell
 if st.session_state.data:
     st.subheader("Sparade bolag")
     import pandas as pd
@@ -174,6 +186,5 @@ if st.session_state.data:
     df = pd.DataFrame.from_dict(st.session_state.data, orient="index")
     df.index.name = "Bolagsnamn"
     st.dataframe(df)
-
 else:
     st.info("Inga bolag sparade än.")
