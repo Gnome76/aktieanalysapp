@@ -15,17 +15,17 @@ def load_data():
         return pd.DataFrame()
 
 def save_data(df):
-    df.to_json(DATA_PATH, orient="records")
+    df.to_json(DATA_PATH, orient="records", force_ascii=False)
 
 def calculate_targets(df):
     def mean_pe(row):
         pes = [row.get(k, None) for k in ['pe1', 'pe2', 'pe3', 'pe4']]
-        pes = [x for x in pes if x is not None]
+        pes = [x for x in pes if pd.notnull(x) and x > 0]
         return sum(pes)/len(pes) if pes else None
 
     def mean_ps(row):
         pss = [row.get(k, None) for k in ['ps1', 'ps2', 'ps3', 'ps4']]
-        pss = [x for x in pss if x is not None]
+        pss = [x for x in pss if pd.notnull(x) and x > 0]
         return sum(pss)/len(pss) if pss else None
 
     df = df.copy()
@@ -39,16 +39,6 @@ def calculate_targets(df):
     df['max_undervardering'] = df[['undervardering_pe_pct', 'undervardering_ps_pct']].max(axis=1)
 
     return df
-
-def color_pct(val):
-    if pd.isnull(val):
-        return ""
-    if val >= 30:
-        return f"<span style='color:green;font-weight:bold'>{val:.2f}%</span>"
-    elif val < 0:
-        return f"<span style='color:red;font-weight:bold'>{val:.2f}%</span>"
-    else:
-        return f"{val:.2f}%"
    def bolagsform(st_session_state):
     st.header("Lägg till / Redigera bolag")
 
@@ -61,24 +51,22 @@ def color_pct(val):
 
     # Kontrollera om bolaget finns för redigering
     edit_mode = False
+    bolag_data = {}
     if bolagsnamn and bolagsnamn in df['bolagsnamn'].values:
         edit_mode = True
-        bolag_data = df[df['bolagsnamn'] == bolagsnamn].iloc[0]
-    else:
-        bolag_data = {}
+        bolag_data = df[df['bolagsnamn'] == bolagsnamn].iloc[0].to_dict()
 
     # Visa nuvarande kurs alltid
-    nuvarande_kurs = st.number_input("Nuvarande kurs (kr)", value=float(bolag_data.get('nuvarande_kurs', 0)), min_value=0.0)
+    nuvarande_kurs = st.number_input("Nuvarande kurs (kr)", value=float(bolag_data.get('nuvarande_kurs', 0.0)), min_value=0.0)
 
     visa_detaljer = st.checkbox("Visa detaljerade nyckeltal")
 
-    # Visa övriga fält om checkbox är på
     if visa_detaljer:
-        vinst_forra_aret = st.number_input("Vinst föregående år", value=float(bolag_data.get('vinst_forra_aret', 0)))
-        vinst_i_ar = st.number_input("Vinst i år", value=float(bolag_data.get('vinst_i_ar', 0)))
-        vinst_nasta_ar = st.number_input("Vinst nästa år", value=float(bolag_data.get('vinst_nasta_ar', 0)))
+        vinst_forra_aret = st.number_input("Vinst föregående år", value=float(bolag_data.get('vinst_forra_aret', 0.0)))
+        vinst_i_ar = st.number_input("Vinst i år", value=float(bolag_data.get('vinst_i_ar', 0.0)))
+        vinst_nasta_ar = st.number_input("Vinst nästa år", value=float(bolag_data.get('vinst_nasta_ar', 0.0)))
 
-        omsattning_forra_aret = st.number_input("Omsättning föregående år", value=float(bolag_data.get('omsattning_forra_aret', 0)))
+        omsattning_forra_aret = st.number_input("Omsättning föregående år", value=float(bolag_data.get('omsattning_forra_aret', 0.0)))
         omsattningstillvaxt_i_ar_pct = st.number_input("Omsättningstillväxt i år (%)", value=float(bolag_data.get('omsattningstillvaxt_i_ar_pct', 0.0)))
         omsattningstillvaxt_nasta_ar_pct = st.number_input("Omsättningstillväxt nästa år (%)", value=float(bolag_data.get('omsattningstillvaxt_nasta_ar_pct', 0.0)))
 
@@ -92,11 +80,11 @@ def color_pct(val):
         ps3 = st.number_input("P/S år 3", value=float(bolag_data.get('ps3', 0.0)))
         ps4 = st.number_input("P/S år 4", value=float(bolag_data.get('ps4', 0.0)))
     else:
-        # Default values if details not shown or new
-        vinst_forra_aret = bolag_data.get('vinst_forra_aret', 0)
-        vinst_i_ar = bolag_data.get('vinst_i_ar', 0)
-        vinst_nasta_ar = bolag_data.get('vinst_nasta_ar', 0)
-        omsattning_forra_aret = bolag_data.get('omsattning_forra_aret', 0)
+        # Default values om detaljer ej visas eller nytt bolag
+        vinst_forra_aret = bolag_data.get('vinst_forra_aret', 0.0)
+        vinst_i_ar = bolag_data.get('vinst_i_ar', 0.0)
+        vinst_nasta_ar = bolag_data.get('vinst_nasta_ar', 0.0)
+        omsattning_forra_aret = bolag_data.get('omsattning_forra_aret', 0.0)
         omsattningstillvaxt_i_ar_pct = bolag_data.get('omsattningstillvaxt_i_ar_pct', 0.0)
         omsattningstillvaxt_nasta_ar_pct = bolag_data.get('omsattningstillvaxt_nasta_ar_pct', 0.0)
         pe1 = bolag_data.get('pe1', 0.0)
@@ -135,95 +123,40 @@ def color_pct(val):
             "insatt_datum": nu,
         }
 
-        # Uppdatera eller lägg till
         if edit_mode:
-            df.loc[df['bolagsnamn'] == bolagsnamn, df.columns != "insatt_datum"] = pd.Series(ny_rad)
-            # Insatt datum ska uppdateras vid redigering också
-            df.loc[df['bolagsnamn'] == bolagsnamn, 'insatt_datum'] = nu
+            # Uppdatera befintlig rad, inklusive insatt_datum
+            idx = df.index[df['bolagsnamn'] == bolagsnamn][0]
+            for key, value in ny_rad.items():
+                df.at[idx, key] = value
         else:
+            # Lägg till nytt bolag
             df = pd.concat([df, pd.DataFrame([ny_rad])], ignore_index=True)
 
         save_data(df)
         st_session_state.data = df
         st.success(f"Bolaget '{bolagsnamn}' sparat/uppdaterat!")
-def visa_bolag(st_session_state):
-    st.header("Bolagslista & analys")
+def visa_och_ta_bort_bolag(st_session_state):
+    st.header("Översikt över sparade bolag")
 
-    if "data" not in st_session_state or st_session_state.data.empty:
-        st.info("Inga bolag tillagda än.")
-        return
+    if "data" not in st_session_state:
+        st_session_state.data = load_data()
 
-    df = st_session_state.data.copy()
-
-    # Beräkna targetkurser och undervärdering
-    df = calculate_targets(df)
-
-    # Checkbox för att filtrera undervärderade bolag (minst 30% undervärdering)
-    filtrera_undervarderade = st.checkbox("Visa endast bolag med minst 30% undervärdering", value=False)
-
-    if filtrera_undervarderade:
-        df = df[df['max_undervardering'] >= 30]
+    df = st_session_state.data
 
     if df.empty:
-        st.info("Inga bolag matchar filtreringen.")
+        st.info("Inga bolag sparade ännu.")
         return
 
-    # Sortera på max undervärdering, störst först
-    df = df.sort_values(by="max_undervardering", ascending=False).reset_index(drop=True)
+    # Visa tabell
+    st.dataframe(df)
 
-    # Bläddra mellan bolag
-    if "bolagsindex" not in st_session_state:
-        st_session_state.bolagsindex = 0
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col1:
-        if st.button("⬅ Föregående"):
-            st_session_state.bolagsindex = max(st_session_state.bolagsindex - 1, 0)
-    with col3:
-        if st.button("Nästa ➡"):
-            st_session_state.bolagsindex = min(st_session_state.bolagsindex + 1, len(df) - 1)
-
-    idx = st_session_state.bolagsindex
-    valda_bolag = df.iloc[idx]
-
-    st.subheader(f"📄 Detaljer för: {valda_bolag['bolagsnamn']}")
-
-    # Visa nyckeltal i tabellform, enklare formatering
-    info = {
-        "Nuvarande kurs": valda_bolag['nuvarande_kurs'],
-        "Targetkurs P/E": valda_bolag['target_pe'],
-        "Targetkurs P/S": valda_bolag['target_ps'],
-        "Undervärdering P/E (%)": valda_bolag['undervardering_pe_pct'],
-        "Undervärdering P/S (%)": valda_bolag['undervardering_ps_pct'],
-        "Max undervärdering (%)": valda_bolag['max_undervardering'],
-        "Insatt datum": valda_bolag.get('insatt_datum', ''),
-    }
-
-    df_visning = pd.DataFrame(info, index=[0]).T.rename(columns={0: "Värde"})
-
-    # Färg på undervärderingar
-    def highlight_undervardering(val):
-        if isinstance(val, float):
-            if val >= 30:
-                color = "green"
-            elif val < 0:
-                color = "red"
-            else:
-                color = "black"
-            return f"color: {color}; font-weight: bold"
-        return ""
-
-    st.dataframe(df_visning.style.applymap(highlight_undervardering, subset=["Värde"]))
-
-    # Knapp för att ta bort bolaget
-    if st.button("Ta bort detta bolag"):
-        bolagsnamn = valda_bolag['bolagsnamn']
-        df = df.drop(valda_bolag.name).reset_index(drop=True)
+    # Ta bort bolag
+    ta_bort_bolag = st.selectbox("Välj bolag att ta bort", options=[""] + df["bolagsnamn"].tolist())
+    if ta_bort_bolag and st.button("Ta bort valt bolag"):
+        df = df[df["bolagsnamn"] != ta_bort_bolag].reset_index(drop=True)
         save_data(df)
         st_session_state.data = df
-        st_session_state.bolagsindex = max(0, st_session_state.bolagsindex - 1)
-        st.success(f"Bolaget '{bolagsnamn}' borttaget.")
-        st.experimental_rerun()
+        st.success(f"Bolaget '{ta_bort_bolag}' har tagits bort.")
     def main():
     st.set_page_config(page_title="Aktieanalysapp", layout="centered")
 
@@ -235,12 +168,14 @@ def visa_bolag(st_session_state):
 
     st.title("📈 Aktieanalysapp")
 
-    menyval = st.sidebar.radio("Meny", ["Lägg till / Redigera bolag", "Visa bolag"])
+    menyval = st.sidebar.radio("Meny", ["Lägg till / Redigera bolag", "Visa bolag", "Översikt och ta bort"])
 
     if menyval == "Lägg till / Redigera bolag":
         bolagsform(st.session_state)
     elif menyval == "Visa bolag":
         visa_bolag(st.session_state)
+    elif menyval == "Översikt och ta bort":
+        visa_och_ta_bort_bolag(st.session_state)
 
 if __name__ == "__main__":
     main()    
