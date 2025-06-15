@@ -4,407 +4,326 @@ import json
 import os
 from datetime import datetime
 
-DATA_PATH = "aktie_data.json"
+DATA_PATH = "aktiedata.json"
 
-# --- Funktion: Ladda data från JSON ---
 def las_in_data():
     if os.path.exists(DATA_PATH):
         with open(DATA_PATH, "r") as f:
             data = json.load(f)
-        df = pd.DataFrame(data)
-        # Säkerställ att kolumner finns
-        expected_cols = [
-            "bolagsnamn", "nuvarande_kurs", "vinst_fjol", "vinst_ars", "vinst_nasta_ar",
-            "omsattning_fjol", "omsattningstillvaxt_ars", "omsattningstillvaxt_nasta_ar",
-            "nuvarande_pe", "pe_1", "pe_2", "pe_3", "pe_4",
-            "nuvarande_ps", "ps_1", "ps_2", "ps_3", "ps_4",
+            df = pd.DataFrame(data)
+            if not df.empty:
+                df["insatt_datum"] = pd.to_datetime(df["insatt_datum"])
+                df["senast_andrad"] = pd.to_datetime(df["senast_andrad"])
+            return df
+    else:
+        # Skapa tom DataFrame med rätt kolumner om fil saknas
+        kolumner = [
+            "bolagsnamn", "kurs", "vinst_fjol", "vinst_i_ar", "vinst_nasta_ar",
+            "omsattning_fjol", "omsattningstillvaxt_ar_1", "omsattningstillvaxt_ar_2",
+            "pe_aktuell", "pe_1", "pe_2", "pe_3", "pe_4",
+            "ps_aktuell", "ps_1", "ps_2", "ps_3", "ps_4",
             "insatt_datum", "senast_andrad"
         ]
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = None
-        return df[expected_cols]
-    else:
-        return pd.DataFrame(columns=[
-            "bolagsnamn", "nuvarande_kurs", "vinst_fjol", "vinst_ars", "vinst_nasta_ar",
-            "omsattning_fjol", "omsattningstillvaxt_ars", "omsattningstillvaxt_nasta_ar",
-            "nuvarande_pe", "pe_1", "pe_2", "pe_3", "pe_4",
-            "nuvarande_ps", "ps_1", "ps_2", "ps_3", "ps_4",
-            "insatt_datum", "senast_andrad"
-        ])
+        return pd.DataFrame(columns=kolumner)
 
-# --- Funktion: Spara data till JSON ---
 def spara_data(df):
+    # Konvertera datum till str innan sparande
+    df_spara = df.copy()
+    df_spara["insatt_datum"] = df_spara["insatt_datum"].astype(str)
+    df_spara["senast_andrad"] = df_spara["senast_andrad"].astype(str)
     with open(DATA_PATH, "w") as f:
-        json.dump(df.to_dict(orient="records"), f, indent=2)
+        json.dump(df_spara.to_dict(orient="records"), f, indent=2)
 
-# --- Funktion: Beräkna targetkurser och undervärdering ---
+def lagg_till_eller_uppdatera_bolag(df, nytt_bolag):
+    bolagsnamn_ny = nytt_bolag["bolagsnamn"].lower()
+    # Kontrollera om bolaget redan finns (case-insensitive)
+    idx = df.index[df["bolagsnamn"].str.lower() == bolagsnamn_ny].tolist()
+
+    nu = datetime.now()
+
+    if idx:
+        # Uppdatera befintligt bolag
+        i = idx[0]
+        for key, value in nytt_bolag.items():
+            df.at[i, key] = value
+        df.at[i, "senast_andrad"] = nu
+    else:
+        # Lägg till nytt bolag
+        nytt_bolag["insatt_datum"] = nu
+        nytt_bolag["senast_andrad"] = nu
+        df = pd.concat([df, pd.DataFrame([nytt_bolag])], ignore_index=True)
+    return df
+
 def berakna_targetkurser(df):
     if df.empty:
         return df
 
-    # Säkerställ att kolumner är numeriska för beräkning
-    num_cols = [
-        "vinst_nasta_ar", "pe_1", "pe_2",
-        "ps_1", "ps_2",
-        "nuvarande_kurs", "nuvarande_pe", "nuvarande_ps"
-    ]
-    for col in num_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    # Beräkna targetkurs_pe
     def calc_target_pe(row):
-        if pd.notnull(row["vinst_nasta_ar"]) and pd.notnull(row["pe_1"]) and pd.notnull(row["pe_2"]):
+        try:
             return row["vinst_nasta_ar"] * ((row["pe_1"] + row["pe_2"]) / 2)
-        else:
+        except Exception:
+            return None
+
+    def calc_target_ps(row):
+        try:
+            ps_avg = (row["ps_1"] + row["ps_2"]) / 2
+            tillvaxt_avg = (row["omsattningstillvaxt_ar_1"] + row["omsattningstillvaxt_ar_2"]) / 2 / 100
+            return ps_avg * (1 + tillvaxt_avg) * row["kurs"]
+        except Exception:
             return None
 
     df["targetkurs_pe"] = df.apply(calc_target_pe, axis=1)
-
-    # Beräkna genomsnittlig omsättningstillväxt
-    def genoms_omsattningstillvaxt(row):
-        vals = []
-        for val in [row["omsattningstillvaxt_ars"], row["omsattningstillvaxt_nasta_ar"]]:
-            try:
-                if pd.notnull(val):
-                    vals.append(float(val))
-            except:
-                pass
-        if vals:
-            return sum(vals)/len(vals)/100  # Procent till decimal
-        else:
-            return None
-
-    df["genoms_omsattningstillvaxt"] = df.apply(genoms_omsattningstillvaxt, axis=1)
-
-    # Beräkna targetkurs_ps
-    def calc_target_ps(row):
-        if pd.notnull(row["ps_1"]) and pd.notnull(row["ps_2"]) and pd.notnull(row["genoms_omsattningstillvaxt"]):
-            medel_ps = (row["ps_1"] + row["ps_2"]) / 2
-            return medel_ps * (1 + row["genoms_omsattningstillvaxt"]) * row["nuvarande_kurs"]
-        else:
-            return None
-
     df["targetkurs_ps"] = df.apply(calc_target_ps, axis=1)
 
-    # Beräkna undervärdering % (lägst av P/E och P/S)
+    # Beräkna undervärdering i procent
     def calc_undervardering(row):
-        if pd.notnull(row["targetkurs_pe"]) and pd.notnull(row["nuvarande_kurs"]) and row["targetkurs_pe"] > 0:
-            underv_pe = (row["targetkurs_pe"] - row["nuvarande_kurs"]) / row["targetkurs_pe"] * 100
-        else:
-            underv_pe = None
-        if pd.notnull(row["targetkurs_ps"]) and pd.notnull(row["nuvarande_kurs"]) and row["targetkurs_ps"] > 0:
-            underv_ps = (row["targetkurs_ps"] - row["nuvarande_kurs"]) / row["targetkurs_ps"] * 100
-        else:
-            underv_ps = None
-
-        undervarderingar = [v for v in [underv_pe, underv_ps] if v is not None]
-        if undervarderingar:
-            return max(undervarderingar)
-        else:
+        try:
+            underv_pe = (row["targetkurs_pe"] - row["kurs"]) / row["targetkurs_pe"] * 100 if row["targetkurs_pe"] else None
+            underv_ps = (row["targetkurs_ps"] - row["kurs"]) / row["targetkurs_ps"] * 100 if row["targetkurs_ps"] else None
+            if underv_pe is None and underv_ps is None:
+                return None
+            elif underv_pe is None:
+                return underv_ps
+            elif underv_ps is None:
+                return underv_pe
+            else:
+                return max(underv_pe, underv_ps)
+        except Exception:
             return None
 
-    df["undervardering_pct"] = df.apply(calc_undervardering, axis=1)
-
-    # Köp värd vid 30% rabatt (targetkurs * 0.7)
-    df["kopvard_30pct_pe"] = df["targetkurs_pe"] * 0.7
-    df["kopvard_30pct_ps"] = df["targetkurs_ps"] * 0.7
+    df["undervarderad_procent"] = df.apply(calc_undervardering, axis=1)
+    df["kopvard_30procent"] = df["targetkurs_pe"] * 0.7
 
     return df
 
-# --- Del 3: Funktioner för att lägga till, uppdatera och visa bolag ---
+import os
+import json
+
+DATA_PATH = "aktiedata.json"
+
+def las_in_data():
+    if not os.path.exists(DATA_PATH):
+        # Returnera tom DataFrame med rätt kolumner om filen inte finns
+        kolumner = [
+            "bolagsnamn", "kurs", "vinst_forra_aret", "vinst_i_ar", "vinst_nasta_ar",
+            "omsattning_forra_aret", "omsattningstillvaxt_ar_1", "omsattningstillvaxt_ar_2",
+            "pe", "pe_1", "pe_2", "pe_3", "pe_4",
+            "ps", "ps_1", "ps_2", "ps_3", "ps_4",
+            "insatt_datum", "senast_andrad"
+        ]
+        return pd.DataFrame(columns=kolumner)
+    else:
+        with open(DATA_PATH, "r") as f:
+            data = json.load(f)
+        df = pd.DataFrame(data)
+        # Konvertera datumfält till datetime
+        if "insatt_datum" in df.columns:
+            df["insatt_datum"] = pd.to_datetime(df["insatt_datum"], errors="coerce")
+        if "senast_andrad" in df.columns:
+            df["senast_andrad"] = pd.to_datetime(df["senast_andrad"], errors="coerce")
+        # Säkerställ numeriska kolumner är rätt typ
+        num_cols = [
+            "kurs", "vinst_forra_aret", "vinst_i_ar", "vinst_nasta_ar",
+            "omsattning_forra_aret", "omsattningstillvaxt_ar_1", "omsattningstillvaxt_ar_2",
+            "pe", "pe_1", "pe_2", "pe_3", "pe_4",
+            "ps", "ps_1", "ps_2", "ps_3", "ps_4"
+        ]
+        for col in num_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+
+def spara_data(df):
+    # Om datumfält finns, konvertera till str för JSON
+    df_skriv = df.copy()
+    for col in ["insatt_datum", "senast_andrad"]:
+        if col in df_skriv.columns:
+            df_skriv[col] = df_skriv[col].astype(str)
+    with open(DATA_PATH, "w") as f:
+        f.write(df_skriv.to_json(orient="records", force_ascii=False))
+
+def formatera_datum(dt):
+    if pd.isna(dt):
+        return "-"
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+from datetime import datetime
 
 def lagg_till_eller_uppdatera_bolag(df, nytt_bolag):
     bolagsnamn_ny = nytt_bolag["bolagsnamn"].strip().lower()
-    if "bolagsnamn" not in df.columns:
-        df = pd.DataFrame(columns=nytt_bolag.keys())
+    idx = df.index[df["bolagsnamn"].str.lower() == bolagsnamn_ny].tolist()
 
-    # Rensa index om df är tom
-    if df.empty:
-        df = pd.DataFrame(columns=nytt_bolag.keys())
+    now = datetime.now()
 
-    # Kontrollera om bolaget redan finns (case insensitive)
-    if "bolagsnamn" in df.columns:
-        # Säkerställ att alla bolagsnamn är strängar
-        df["bolagsnamn"] = df["bolagsnamn"].astype(str)
-
-        idx = df.index[df["bolagsnamn"].str.lower() == bolagsnamn_ny].tolist()
-        if idx:
-            i = idx[0]
-            for key, value in nytt_bolag.items():
-                df.at[i, key] = value
-            df.at[i, "senast_andrad"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.success(f"Bolag '{nytt_bolag['bolagsnamn']}' uppdaterat.")
-        else:
-            nytt_bolag["insatt_datum"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            nytt_bolag["senast_andrad"] = ""
-            df = pd.concat([df, pd.DataFrame([nytt_bolag])], ignore_index=True)
-            st.success(f"Bolag '{nytt_bolag['bolagsnamn']}' tillagt.")
+    if idx:
+        # Uppdatera befintligt bolag
+        i = idx[0]
+        for nyckel, varde in nytt_bolag.items():
+            df.at[i, nyckel] = varde
+        df.at[i, "senast_andrad"] = now
     else:
-        # Om "bolagsnamn" saknas, lägg till hela raden
-        nytt_bolag["insatt_datum"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        nytt_bolag["senast_andrad"] = ""
+        # Lägg till nytt bolag
+        nytt_bolag["insatt_datum"] = now
+        nytt_bolag["senast_andrad"] = now
         df = pd.concat([df, pd.DataFrame([nytt_bolag])], ignore_index=True)
-        st.success(f"Bolag '{nytt_bolag['bolagsnamn']}' tillagt.")
     return df
 
-def visa_form(df):
-    with st.form(key="form_add_bolag"):
-        st.header("Lägg till eller uppdatera bolag")
+def beräkna_targetkurser(df):
+    if df.empty:
+        return df
 
-        bolagsnamn = st.text_input("Bolagsnamn")
-        nuvarande_kurs = st.number_input("Nuvarande kurs", min_value=0.0, format="%.2f")
-        vinst_foregaende_ar = st.number_input("Vinst förra året", format="%.2f")
-        vinst_nasta_ar = st.number_input("Förväntad vinst nästa år", format="%.2f")
-        omsattning_foregaende_ar = st.number_input("Omsättning förra året", format="%.2f")
-        omsattningstillvaxt_ar = st.number_input("Förväntad omsättningstillväxt i år (%)", format="%.2f")
-        omsattningstillvaxt_nasta_ar = st.number_input("Förväntad omsättningstillväxt nästa år (%)", format="%.2f")
-
-        pe_0 = st.number_input("Nuvarande P/E", min_value=0.0, format="%.2f")
-        pe_1 = st.number_input("P/E 1", min_value=0.0, format="%.2f")
-        pe_2 = st.number_input("P/E 2", min_value=0.0, format="%.2f")
-        pe_3 = st.number_input("P/E 3", min_value=0.0, format="%.2f")
-        pe_4 = st.number_input("P/E 4", min_value=0.0, format="%.2f")
-
-        ps_0 = st.number_input("Nuvarande P/S", min_value=0.0, format="%.2f")
-        ps_1 = st.number_input("P/S 1", min_value=0.0, format="%.2f")
-        ps_2 = st.number_input("P/S 2", min_value=0.0, format="%.2f")
-        ps_3 = st.number_input("P/S 3", min_value=0.0, format="%.2f")
-        ps_4 = st.number_input("P/S 4", min_value=0.0, format="%.2f")
-
-        submit_button = st.form_submit_button(label="Spara bolag")
-
-    if submit_button:
-        nytt_bolag = {
-            "bolagsnamn": bolagsnamn,
-            "nuvarande_kurs": nuvarande_kurs,
-            "vinst_foregaende_ar": vinst_foregaende_ar,
-            "vinst_nasta_ar": vinst_nasta_ar,
-            "omsattning_foregaende_ar": omsattning_foregaende_ar,
-            "omsattningstillvaxt_ar": omsattningstillvaxt_ar,
-            "omsattningstillvaxt_nasta_ar": omsattningstillvaxt_nasta_ar,
-            "pe_0": pe_0,
-            "pe_1": pe_1,
-            "pe_2": pe_2,
-            "pe_3": pe_3,
-            "pe_4": pe_4,
-            "ps_0": ps_0,
-            "ps_1": ps_1,
-            "ps_2": ps_2,
-            "ps_3": ps_3,
-            "ps_4": ps_4,
-        }
-        df = lagg_till_eller_uppdatera_bolag(df, nytt_bolag)
-        spara_data(df)
-    return df
-
-# --- Del 4: Beräkning av targetkurser och filtrering av bolag ---
-
-def berakna_targetkurser(df):
-    # Försök räkna ut targetkurser och undervärdering, hantera saknade värden försiktigt
-    def safe_mean(values):
-        valid = [v for v in values if v is not None and v > 0]
-        return sum(valid) / len(valid) if valid else None
+    def safe_mean(vals):
+        vals = [v for v in vals if pd.notna(v)]
+        if not vals:
+            return None
+        return sum(vals) / len(vals)
 
     # Targetkurs baserad på P/E
-    def targetkurs_pe(row):
-        pe_vals = [row.get("pe_1"), row.get("pe_2")]
-        pe_med = safe_mean(pe_vals)
-        if pe_med is None or row.get("vinst_nasta_ar") is None:
+    df["targetkurs_pe"] = df.apply(
+        lambda row: row["vinst_nasta_ar"] * safe_mean([row.get("pe_1"), row.get("pe_2")])
+        if pd.notna(row["vinst_nasta_ar"]) and safe_mean([row.get("pe_1"), row.get("pe_2")]) else None,
+        axis=1,
+    )
+
+    # Targetkurs baserad på P/S, beräknas som medelvärde av P/S * medel omsättningstillväxt * omsättning förra året
+    df["targetkurs_ps"] = df.apply(
+        lambda row: (
+            row["omsattning_forra_aret"]
+            * safe_mean([row.get("ps_1"), row.get("ps_2")])
+            * (1 + safe_mean([row.get("omsattningstillvaxt_ar_1"), row.get("omsattningstillvaxt_ar_2")]) / 100)
+            if pd.notna(row["omsattning_forra_aret"]) and safe_mean([row.get("ps_1"), row.get("ps_2")]) and safe_mean([row.get("omsattningstillvaxt_ar_1"), row.get("omsattningstillvaxt_ar_2")]) is not None
+            else None
+        ),
+        axis=1,
+    )
+
+    # Undervärdering i procent baserat på lägsta targetkurs av P/E och P/S
+    def undervarderad_pct(row):
+        if pd.isna(row["kurs"]) or (pd.isna(row["targetkurs_pe"]) and pd.isna(row["targetkurs_ps"])):
             return None
-        return row["vinst_nasta_ar"] * pe_med
-
-    # Targetkurs baserad på P/S
-    def targetkurs_ps(row):
-        ps_vals = [row.get("ps_1"), row.get("ps_2")]
-        ps_med = safe_mean(ps_vals)
-        oms_tillv_vals = [row.get("omsattningstillvaxt_ar"), row.get("omsattningstillvaxt_nasta_ar")]
-        oms_tillv_med = safe_mean(oms_tillv_vals)
-        omsattning = row.get("omsattning_foregaende_ar")
-        if None in (ps_med, oms_tillv_med, omsattning):
+        target_min = min(filter(pd.notna, [row["targetkurs_pe"], row["targetkurs_ps"]]), default=None)
+        if target_min is None or target_min == 0:
             return None
-        oms_tillv_factor = 1 + oms_tillv_med / 100
-        return ps_med * omsattning * oms_tillv_factor
+        return round((target_min - row["kurs"]) / target_min * 100, 2)
 
-    df = df.copy()
+    df["undervarderad_pct"] = df.apply(undervarderad_pct, axis=1)
 
-    df["targetkurs_pe"] = df.apply(lambda row: targetkurs_pe(row), axis=1)
-    df["targetkurs_ps"] = df.apply(lambda row: targetkurs_ps(row), axis=1)
-
-    # Undervärdering i procent jämfört med nuvarande kurs
-    def undervarderingsprocent(row):
-        kurs = row.get("nuvarande_kurs")
-        targets = [row.get("targetkurs_pe"), row.get("targetkurs_ps")]
-        targets = [t for t in targets if t is not None and t > 0]
-        if kurs is None or kurs == 0 or not targets:
+    # Köp vid 30% rabatt (målpris = targetkurs * 0.7)
+    def kopvard_pris(row):
+        target_min = min(filter(pd.notna, [row.get("targetkurs_pe"), row.get("targetkurs_ps")]), default=None)
+        if target_min is None:
             return None
-        max_target = max(targets)
-        return (max_target - kurs) / max_target * 100
+        return round(target_min * 0.7, 2)
 
-    df["undervarderingsprocent"] = df.apply(undervarderingsprocent, axis=1)
-
-    # Köpvärd kurs vid 30% rabatt på max targetkurs
-    def kopvard_kurs(row):
-        targets = [row.get("targetkurs_pe"), row.get("targetkurs_ps")]
-        targets = [t for t in targets if t is not None and t > 0]
-        if not targets:
-            return None
-        max_target = max(targets)
-        return max_target * 0.7
-
-    df["kopvard_kurs_30"] = df.apply(kopvard_kurs, axis=1)
+    df["kopvard_30"] = df.apply(kopvard_pris, axis=1)
 
     return df
 
 def filtrera_bolag(df, endast_undervarderade):
-    df = berakna_targetkurser(df)
-
+    df = beräkna_targetkurser(df)
     if endast_undervarderade:
-        # Filtrera bolag med minst 30% undervärdering
-        df = df[df["undervarderingsprocent"] >= 30]
+        df = df[df["undervarderad_pct"] >= 30]
+    # Sortera på undervärdering (fallande)
+    df = df.sort_values(by="undervarderad_pct", ascending=False)
+    return df.reset_index(drop=True)
 
-    # Sortera på mest undervärderade först (störst procent)
-    df = df.sort_values(by="undervarderingsprocent", ascending=False, na_position="last")
-    df = df.reset_index(drop=True)
+import streamlit as st
+
+def ta_bort_bolag(df, bolagsnamn):
+    bolagsnamn = bolagsnamn.strip().lower()
+    df = df[~(df["bolagsnamn"].str.lower() == bolagsnamn)].reset_index(drop=True)
     return df
 
-# --- Del 5: Visning, inmatning, redigering och borttagning av bolag ---
-
-def visa_bolag(df):
-    st.subheader("Översikt av sparade bolag")
+def visa_oversikt_tabell(df):
     if df.empty:
-        st.info("Inga bolag sparade ännu.")
+        st.info("Inga bolag att visa.")
+        return
+    st.dataframe(df[[
+        "bolagsnamn", "kurs", "targetkurs_pe", "targetkurs_ps", "undervarderad_pct", "kopvard_30"
+    ]].style.format({
+        "kurs": "{:.2f}",
+        "targetkurs_pe": "{:.2f}",
+        "targetkurs_ps": "{:.2f}",
+        "undervarderad_pct": "{:.2f} %",
+        "kopvard_30": "{:.2f}",
+    }))
+
+def visa_enskild_bolagsvy(df, index):
+    if df.empty or index >= len(df) or index < 0:
+        st.info("Inget bolag valt eller index utanför intervall.")
         return
 
-    # Visa bolagstabell med utvalda kolumner
-    visningskolumner = [
-        "bolagsnamn", "nuvarande_kurs", "targetkurs_pe", "targetkurs_ps",
-        "undervarderingsprocent", "kopvard_kurs_30"
-    ]
-    df_vis = df[visningskolumner].copy()
-    df_vis["undervarderingsprocent"] = df_vis["undervarderingsprocent"].map(
-        lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A"
-    )
-    df_vis["targetkurs_pe"] = df_vis["targetkurs_pe"].map(
-        lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
-    )
-    df_vis["targetkurs_ps"] = df_vis["targetkurs_ps"].map(
-        lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
-    )
-    df_vis["kopvard_kurs_30"] = df_vis["kopvard_kurs_30"].map(
-        lambda x: f"{x:.2f}" if pd.notna(x) else "N/A"
-    )
-    st.dataframe(df_vis, use_container_width=True)
+    bolag = df.iloc[index]
 
-def lagg_till_bolag(df):
-    st.subheader("Lägg till nytt bolag")
+    st.subheader(f"Bolag: {bolag['bolagsnamn']}")
+    st.markdown(f"**Nuvarande kurs:** {bolag['kurs']:.2f} SEK")
+    st.markdown(f"**Targetkurs P/E:** {bolag['targetkurs_pe']:.2f} SEK")
+    st.markdown(f"**Targetkurs P/S:** {bolag['targetkurs_ps']:.2f} SEK")
+    st.markdown(f"**Undervärdering:** {bolag['undervarderad_pct']:.2f} %")
+    st.markdown(f"**Köpvärd vid 30% rabatt:** {bolag['kopvard_30']:.2f} SEK")
 
-    with st.form("form_lagg_till_bolag"):
-        bolagsnamn = st.text_input("Bolagsnamn")
-        nuvarande_kurs = st.number_input("Nuvarande kurs", min_value=0.0, format="%.2f")
-        vinst_foregaende_ar = st.number_input("Vinst förra året", format="%.2f")
-        vinst_nasta_ar = st.number_input("Förväntad vinst nästa år", format="%.2f")
-        omsattning_foregaende_ar = st.number_input("Omsättning förra året", format="%.2f")
-        omsattningstillvaxt_ar = st.number_input("Förväntad omsättningstillväxt i år (%)", format="%.2f")
-        omsattningstillvaxt_nasta_ar = st.number_input("Förväntad omsättningstillväxt nästa år (%)", format="%.2f")
-        pe_1 = st.number_input("P/E 1", min_value=0.0, format="%.2f")
-        pe_2 = st.number_input("P/E 2", min_value=0.0, format="%.2f")
-        ps_1 = st.number_input("P/S 1", min_value=0.0, format="%.2f")
-        ps_2 = st.number_input("P/S 2", min_value=0.0, format="%.2f")
+    # Visa övriga nyckeltal
+    nyckeltal = {
+        "Vinst förra året": bolag.get("vinst_forra_aret", "N/A"),
+        "Vinst nästa år": bolag.get("vinst_nasta_ar", "N/A"),
+        "Omsättning förra året": bolag.get("omsattning_forra_aret", "N/A"),
+        "Omsättningstillväxt år 1 (%)": bolag.get("omsattningstillvaxt_ar_1", "N/A"),
+        "Omsättningstillväxt år 2 (%)": bolag.get("omsattningstillvaxt_ar_2", "N/A"),
+        "P/E nuvarande": bolag.get("pe_nuvarande", "N/A"),
+        "P/E 1": bolag.get("pe_1", "N/A"),
+        "P/E 2": bolag.get("pe_2", "N/A"),
+        "P/S nuvarande": bolag.get("ps_nuvarande", "N/A"),
+        "P/S 1": bolag.get("ps_1", "N/A"),
+        "P/S 2": bolag.get("ps_2", "N/A"),
+        "Insatt datum": bolag.get("insatt_datum", "N/A"),
+        "Senast ändrad": bolag.get("senast_andrad", "N/A"),
+    }
+    for nyckel, varde in nyckeltal.items():
+        st.markdown(f"**{nyckel}:** {varde}")
 
-        submitted = st.form_submit_button("Lägg till bolag")
+def huvudmeny(df):
+    st.sidebar.title("Aktieanalysapp")
+    menyval = st.sidebar.radio("Välj vy", ["Visa översikt", "Lägg till / Uppdatera bolag", "Ta bort bolag", "Visa bolag enskilt"])
+    return menyval
 
-    if submitted:
-        nytt_bolag = {
-            "bolagsnamn": bolagsnamn.strip(),
-            "nuvarande_kurs": nuvarande_kurs,
-            "vinst_foregaende_ar": vinst_foregaende_ar,
-            "vinst_nasta_ar": vinst_nasta_ar,
-            "omsattning_foregaende_ar": omsattning_foregaende_ar,
-            "omsattningstillvaxt_ar": omsattningstillvaxt_ar,
-            "omsattningstillvaxt_nasta_ar": omsattningstillvaxt_nasta_ar,
-            "pe_1": pe_1,
-            "pe_2": pe_2,
-            "ps_1": ps_1,
-            "ps_2": ps_2,
-        }
-
-        if not nytt_bolag["bolagsnamn"]:
-            st.error("Bolagsnamn får inte vara tomt.")
-        else:
-            df = lagg_till_eller_uppdatera_bolag(df, nytt_bolag)
-            st.success(f"Bolag '{nytt_bolag['bolagsnamn']}' har lagts till eller uppdaterats.")
-            spara_data(df)
-            st.experimental_rerun()
-
-    return df
-
-def lagg_till_eller_uppdatera_bolag(df, bolag_dict):
-    bolagsnamn_ny = bolag_dict["bolagsnamn"].lower()
-    df = df.copy()
-
-    # Kontrollera om bolaget finns redan (case-insensitivt)
-    if "bolagsnamn" in df.columns:
-        idx_list = df.index[df["bolagsnamn"].str.lower() == bolagsnamn_ny].tolist()
-    else:
-        idx_list = []
-
-    if idx_list:
-        idx = idx_list[0]
-        # Uppdatera existerande rad
-        for key, value in bolag_dict.items():
-            df.at[idx, key] = value
-        df.at[idx, "senast_andrad"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        # Lägg till nytt bolag som ny rad
-        bolag_dict["insatt_datum"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-        bolag_dict["senast_andrad"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-        df = pd.concat([df, pd.DataFrame([bolag_dict])], ignore_index=True)
-
-    return df
-
-def ta_bort_bolag(df):
-    st.subheader("Ta bort bolag")
-    if df.empty:
-        st.info("Inga bolag att ta bort.")
-        return df
-
-    bolag_lista = df["bolagsnamn"].tolist()
-    valt_bolag = st.selectbox("Välj bolag att ta bort", options=bolag_lista)
-
-    if st.button("Ta bort valt bolag"):
-        df = df[df["bolagsnamn"] != valt_bolag]
-        spara_data(df)
-        st.success(f"Bolag '{valt_bolag}' har tagits bort.")
-        st.experimental_rerun()
-
-    return df
-
-# --- Del 6: Huvudfunktion och appstart ---
+import streamlit as st
 
 def main():
-    st.title("Aktieanalysapp - Undervärderade Bolag")
+    st.title("Aktieanalysapp")
 
-    # Läs in data
     df = las_in_data()
 
-    # Checkbox för att visa endast undervärderade bolag
-    endast_undervarderade = st.checkbox("Visa endast minst 30% undervärderade bolag", value=False)
+    menyval = huvudmeny(df)
 
-    # Beräkna targetkurser och undervärdering
-    df = beräkna_targetkurser(df)
+    if menyval == "Visa översikt":
+        endast_undervarderade = st.checkbox("Visa endast undervärderade bolag (minst 30 % rabatt)", value=False)
+        filtrerad_df = filtrera_bolag(df, endast_undervarderade)
+        visa_oversikt_tabell(filtrerad_df)
 
-    # Filtrera bolag enligt checkbox
-    filtrerad_df = filtrera_bolag(df, endast_undervarderade)
+    elif menyval == "Lägg till / Uppdatera bolag":
+        df = visa_form(df)
+        spara_data(df)
+        st.success("Bolagsdata uppdaterad och sparad.")
 
-    # Visa bolagstabell
-    visa_bolag(filtrerad_df)
+    elif menyval == "Ta bort bolag":
+        bolagslista = df["bolagsnamn"].tolist()
+        vald_bolag = st.selectbox("Välj bolag att ta bort", bolagslista)
+        if st.button("Ta bort valt bolag"):
+            df = ta_bort_bolag(df, vald_bolag)
+            spara_data(df)
+            st.success(f"Bolag '{vald_bolag}' borttaget.")
 
-    # Lägga till nytt bolag
-    df = lagg_till_bolag(df)
+    elif menyval == "Visa bolag enskilt":
+        if df.empty:
+            st.info("Ingen data att visa.")
+            return
+        index = st.number_input("Ange bolagsindex att visa (0-bas)", min_value=0, max_value=len(df)-1, value=0, step=1)
+        visa_enskild_bolagsvy(df, index)
 
-    # Ta bort bolag
-    df = ta_bort_bolag(df)
+    # Säkerställ att session state uppdateras korrekt utan st.experimental_rerun()
+    if "refresh" in st.session_state and st.session_state["refresh"]:
+        st.session_state["refresh"] = False
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
