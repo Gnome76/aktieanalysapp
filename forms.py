@@ -3,92 +3,123 @@ from datetime import datetime
 
 def input_form():
     with st.form(key="input_form"):
-        st.subheader("➕ Lägg till nytt bolag")
-
         bolagsnamn = st.text_input("Bolagsnamn")
         nuvarande_kurs = st.number_input("Nuvarande kurs", min_value=0.0, format="%.2f")
-
-        vinst_fjol = st.number_input("Vinst förra året", format="%.2f")
+        vinst_forra_aret = st.number_input("Vinst förra året", format="%.2f")
         vinst_i_ar = st.number_input("Förväntad vinst i år", format="%.2f")
         vinst_nastaar = st.number_input("Förväntad vinst nästa år", format="%.2f")
+        omsattning_forra_aret = st.number_input("Omsättning förra året", format="%.2f")
+        omsattningstillvaxt_ar = st.number_input("Omsättningstillväxt i år (%)", format="%.2f")
+        omsattningstillvaxt_nastaar = st.number_input("Omsättningstillväxt nästa år (%)", format="%.2f")
+        pe_nuvarande = st.number_input("Nuvarande P/E", min_value=0.0, format="%.2f")
+        pe_1 = st.number_input("P/E 1", min_value=0.0, format="%.2f")
+        pe_2 = st.number_input("P/E 2", min_value=0.0, format="%.2f")
+        pe_3 = st.number_input("P/E 3", min_value=0.0, format="%.2f")
+        pe_4 = st.number_input("P/E 4", min_value=0.0, format="%.2f")
+        ps_nuvarande = st.number_input("Nuvarande P/S", min_value=0.0, format="%.2f")
+        ps_1 = st.number_input("P/S 1", min_value=0.0, format="%.2f")
+        ps_2 = st.number_input("P/S 2", min_value=0.0, format="%.2f")
+        ps_3 = st.number_input("P/S 3", min_value=0.0, format="%.2f")
+        ps_4 = st.number_input("P/S 4", min_value=0.0, format="%.2f")
 
-        oms_fjol = st.number_input("Omsättning förra året", format="%.2f")
-        oms_tillv_i_ar = st.number_input("Omsättningstillväxt i år (%)", format="%.2f")
-        oms_tillv_nastaar = st.number_input("Omsättningstillväxt nästa år (%)", format="%.2f")
-
-        pe_nu = st.number_input("Nuvarande P/E", format="%.2f")
-        pe1 = st.number_input("P/E 1", format="%.2f")
-        pe2 = st.number_input("P/E 2", format="%.2f")
-        pe3 = st.number_input("P/E 3", format="%.2f")
-        pe4 = st.number_input("P/E 4", format="%.2f")
-
-        ps_nu = st.number_input("Nuvarande P/S", format="%.2f")
-        ps1 = st.number_input("P/S 1", format="%.2f")
-        ps2 = st.number_input("P/S 2", format="%.2f")
-        ps3 = st.number_input("P/S 3", format="%.2f")
-        ps4 = st.number_input("P/S 4", format="%.2f")
-
-        submitted = st.form_submit_button("Spara bolag")
-
+        submitted = st.form_submit_button("Lägg till bolag")
         if submitted:
-            return {
-                "bolagsnamn": bolagsnamn,
+            if bolagsnamn.strip() == "":
+                st.error("Ange bolagsnamn")
+                return None
+            bolag = {
+                "bolagsnamn": bolagsnamn.strip(),
                 "nuvarande_kurs": nuvarande_kurs,
-                "vinst_fjol": vinst_fjol,
+                "vinst_forra_aret": vinst_forra_aret,
                 "vinst_i_ar": vinst_i_ar,
                 "vinst_nastaar": vinst_nastaar,
-                "oms_fjol": oms_fjol,
-                "oms_tillv_i_ar": oms_tillv_i_ar,
-                "oms_tillv_nastaar": oms_tillv_nastaar,
-                "pe_nu": pe_nu,
-                "pe1": pe1,
-                "pe2": pe2,
-                "pe3": pe3,
-                "pe4": pe4,
-                "ps_nu": ps_nu,
-                "ps1": ps1,
-                "ps2": ps2,
-                "ps3": ps3,
-                "ps4": ps4,
-                "insatt_datum": str(datetime.now().date()),
-                "senast_andrad": str(datetime.now().date())
+                "omsattning_forra_aret": omsattning_forra_aret,
+                "omsattningstillvaxt_ar": omsattningstillvaxt_ar,
+                "omsattningstillvaxt_nastaar": omsattningstillvaxt_nastaar,
+                "pe_nuvarande": pe_nuvarande,
+                "pe_1": pe_1,
+                "pe_2": pe_2,
+                "pe_3": pe_3,
+                "pe_4": pe_4,
+                "ps_nuvarande": ps_nuvarande,
+                "ps_1": ps_1,
+                "ps_2": ps_2,
+                "ps_3": ps_3,
+                "ps_4": ps_4,
+                "insatt_datum": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "senast_andrad": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
+            return bolag
     return None
 
 def edit_form(bolag):
     with st.form(key=f"edit_form_{bolag['bolagsnamn']}"):
-        st.subheader(f"✏️ Redigera: {bolag['bolagsnamn']}")
-        ny_kurs = st.number_input("Nuvarande kurs", value=bolag.get("nuvarande_kurs", 0.0), format="%.2f")
+        st.write(f"Redigera bolag: **{bolag['bolagsnamn']}**")
+        # Visa nuvarande kurs som read-only
+        st.write(f"Nuvarande kurs: {bolag['nuvarande_kurs']:.2f}")
 
-        visa_extra = st.checkbox("Visa och redigera övriga fält", key=f"show_extra_{bolag['bolagsnamn']}")
+        # Skapa checkbox för att visa övriga fält
+        visa_ovriga = st.checkbox("Visa och redigera övriga fält")
 
-        uppdaterad = bolag.copy()
-        uppdaterad["nuvarande_kurs"] = ny_kurs
+        if visa_ovriga:
+            vinst_forra_aret = st.number_input("Vinst förra året", value=bolag.get("vinst_forra_aret", 0.0), format="%.2f")
+            vinst_i_ar = st.number_input("Förväntad vinst i år", value=bolag.get("vinst_i_ar", 0.0), format="%.2f")
+            vinst_nastaar = st.number_input("Förväntad vinst nästa år", value=bolag.get("vinst_nastaar", 0.0), format="%.2f")
+            omsattning_forra_aret = st.number_input("Omsättning förra året", value=bolag.get("omsattning_forra_aret", 0.0), format="%.2f")
+            omsattningstillvaxt_ar = st.number_input("Omsättningstillväxt i år (%)", value=bolag.get("omsattningstillvaxt_ar", 0.0), format="%.2f")
+            omsattningstillvaxt_nastaar = st.number_input("Omsättningstillväxt nästa år (%)", value=bolag.get("omsattningstillvaxt_nastaar", 0.0), format="%.2f")
+            pe_nuvarande = st.number_input("Nuvarande P/E", value=bolag.get("pe_nuvarande", 0.0), format="%.2f")
+            pe_1 = st.number_input("P/E 1", value=bolag.get("pe_1", 0.0), format="%.2f")
+            pe_2 = st.number_input("P/E 2", value=bolag.get("pe_2", 0.0), format="%.2f")
+            pe_3 = st.number_input("P/E 3", value=bolag.get("pe_3", 0.0), format="%.2f")
+            pe_4 = st.number_input("P/E 4", value=bolag.get("pe_4", 0.0), format="%.2f")
+            ps_nuvarande = st.number_input("Nuvarande P/S", value=bolag.get("ps_nuvarande", 0.0), format="%.2f")
+            ps_1 = st.number_input("P/S 1", value=bolag.get("ps_1", 0.0), format="%.2f")
+            ps_2 = st.number_input("P/S 2", value=bolag.get("ps_2", 0.0), format="%.2f")
+            ps_3 = st.number_input("P/S 3", value=bolag.get("ps_3", 0.0), format="%.2f")
+            ps_4 = st.number_input("P/S 4", value=bolag.get("ps_4", 0.0), format="%.2f")
+        else:
+            # Behåll gamla värden om checkbox inte är ikryssad
+            vinst_forra_aret = bolag.get("vinst_forra_aret", 0.0)
+            vinst_i_ar = bolag.get("vinst_i_ar", 0.0)
+            vinst_nastaar = bolag.get("vinst_nastaar", 0.0)
+            omsattning_forra_aret = bolag.get("omsattning_forra_aret", 0.0)
+            omsattningstillvaxt_ar = bolag.get("omsattningstillvaxt_ar", 0.0)
+            omsattningstillvaxt_nastaar = bolag.get("omsattningstillvaxt_nastaar", 0.0)
+            pe_nuvarande = bolag.get("pe_nuvarande", 0.0)
+            pe_1 = bolag.get("pe_1", 0.0)
+            pe_2 = bolag.get("pe_2", 0.0)
+            pe_3 = bolag.get("pe_3", 0.0)
+            pe_4 = bolag.get("pe_4", 0.0)
+            ps_nuvarande = bolag.get("ps_nuvarande", 0.0)
+            ps_1 = bolag.get("ps_1", 0.0)
+            ps_2 = bolag.get("ps_2", 0.0)
+            ps_3 = bolag.get("ps_3", 0.0)
+            ps_4 = bolag.get("ps_4", 0.0)
 
-        if visa_extra:
-            uppdaterad["vinst_fjol"] = st.number_input("Vinst förra året", value=bolag.get("vinst_fjol", 0.0), format="%.2f")
-            uppdaterad["vinst_i_ar"] = st.number_input("Förväntad vinst i år", value=bolag.get("vinst_i_ar", 0.0), format="%.2f")
-            uppdaterad["vinst_nastaar"] = st.number_input("Förväntad vinst nästa år", value=bolag.get("vinst_nastaar", 0.0), format="%.2f")
-
-            uppdaterad["oms_fjol"] = st.number_input("Omsättning förra året", value=bolag.get("oms_fjol", 0.0), format="%.2f")
-            uppdaterad["oms_tillv_i_ar"] = st.number_input("Omsättningstillväxt i år (%)", value=bolag.get("oms_tillv_i_ar", 0.0), format="%.2f")
-            uppdaterad["oms_tillv_nastaar"] = st.number_input("Omsättningstillväxt nästa år (%)", value=bolag.get("oms_tillv_nastaar", 0.0), format="%.2f")
-
-            uppdaterad["pe_nu"] = st.number_input("Nuvarande P/E", value=bolag.get("pe_nu", 0.0), format="%.2f")
-            uppdaterad["pe1"] = st.number_input("P/E 1", value=bolag.get("pe1", 0.0), format="%.2f")
-            uppdaterad["pe2"] = st.number_input("P/E 2", value=bolag.get("pe2", 0.0), format="%.2f")
-            uppdaterad["pe3"] = st.number_input("P/E 3", value=bolag.get("pe3", 0.0), format="%.2f")
-            uppdaterad["pe4"] = st.number_input("P/E 4", value=bolag.get("pe4", 0.0), format="%.2f")
-
-            uppdaterad["ps_nu"] = st.number_input("Nuvarande P/S", value=bolag.get("ps_nu", 0.0), format="%.2f")
-            uppdaterad["ps1"] = st.number_input("P/S 1", value=bolag.get("ps1", 0.0), format="%.2f")
-            uppdaterad["ps2"] = st.number_input("P/S 2", value=bolag.get("ps2", 0.0), format="%.2f")
-            uppdaterad["ps3"] = st.number_input("P/S 3", value=bolag.get("ps3", 0.0), format="%.2f")
-            uppdaterad["ps4"] = st.number_input("P/S 4", value=bolag.get("ps4", 0.0), format="%.2f")
-
-        submitted = st.form_submit_button("Uppdatera")
-
+        submitted = st.form_submit_button("Uppdatera bolag")
         if submitted:
-            uppdaterad["senast_andrad"] = str(datetime.now().date())
-            return uppdaterad
+            bolag_uppdaterad = {
+                "bolagsnamn": bolag["bolagsnamn"],
+                "nuvarande_kurs": bolag["nuvarande_kurs"],  # nuvarande kurs är readonly
+                "vinst_forra_aret": vinst_forra_aret,
+                "vinst_i_ar": vinst_i_ar,
+                "vinst_nastaar": vinst_nastaar,
+                "omsattning_forra_aret": omsattning_forra_aret,
+                "omsattningstillvaxt_ar": omsattningstillvaxt_ar,
+                "omsattningstillvaxt_nastaar": omsattningstillvaxt_nastaar,
+                "pe_nuvarande": pe_nuvarande,
+                "pe_1": pe_1,
+                "pe_2": pe_2,
+                "pe_3": pe_3,
+                "pe_4": pe_4,
+                "ps_nuvarande": ps_nuvarande,
+                "ps_1": ps_1,
+                "ps_2": ps_2,
+                "ps_3": ps_3,
+                "ps_4": ps_4,
+                "insatt_datum": bolag.get("insatt_datum", ""),
+                "senast_andrad": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            return bolag_uppdaterad
     return None
