@@ -1,43 +1,38 @@
 def calculate_targetkurs_pe(bolag):
     try:
-        vinst_nasta_aar = bolag.get("vinst_nasta_aar", 0)
-        pe1 = bolag.get("pe1", 0)
-        pe2 = bolag.get("pe2", 0)
-        if pe1 > 0 and pe2 > 0:
-            return vinst_nasta_aar * ((pe1 + pe2) / 2)
-        else:
-            return 0
+        vinst = float(bolag.get("vinst_nastaar", 0))
+        pe1 = float(bolag.get("pe1", 0))
+        pe2 = float(bolag.get("pe2", 0))
+        if vinst > 0 and pe1 > 0 and pe2 > 0:
+            return vinst * ((pe1 + pe2) / 2)
     except Exception:
-        return 0
-
+        pass
+    return 0
 
 def calculate_targetkurs_ps(bolag):
     try:
-        ps1 = bolag.get("ps1", 0)
-        ps2 = bolag.get("ps2", 0)
-        omsattningstillvxt_i_aar = bolag.get("omsattningstillvxt_i_aar", 0) / 100
-        omsattningstillvxt_nasta_aar = bolag.get("omsattningstillvxt_nasta_aar", 0) / 100
-        omsattningstillvxt_medel = (omsattningstillvxt_i_aar + omsattningstillvxt_nasta_aar) / 2
-        kurs = bolag.get("kurs", 0)
+        ps1 = float(bolag.get("ps1", 0))
+        ps2 = float(bolag.get("ps2", 0))
+        oms_tillvaxt_i_ar = float(bolag.get("omsattningstillvaxt_i_ar", 0))
+        oms_tillvaxt_nastaar = float(bolag.get("omsattningstillvaxt_nastaar", 0))
+        oms_tillvaxt = (oms_tillvaxt_i_ar + oms_tillvaxt_nastaar) / 2 / 100  # procentsats till decimal
         if ps1 > 0 and ps2 > 0:
-            medel_ps = (ps1 + ps2) / 2
-            return medel_ps * (1 + omsattningstillvxt_medel) * kurs
-        else:
-            return 0
+            avg_ps = (ps1 + ps2) / 2
+            return avg_ps * (1 + oms_tillvaxt)
     except Exception:
-        return 0
-
+        pass
+    return 0
 
 def calculate_undervardering(bolag):
     try:
-        kurs = bolag.get("kurs", 0)
-        target_pe = bolag.get("targetkurs_pe", 0)
-        target_ps = bolag.get("targetkurs_ps", 0)
-        if target_pe > 0 and target_ps > 0:
-            undervardering_pe = max(0, (target_pe - kurs) / target_pe * 100)
-            undervardering_ps = max(0, (target_ps - kurs) / target_ps * 100)
-            return max(undervardering_pe, undervardering_ps)
-        else:
+        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
+        target_pe = calculate_targetkurs_pe(bolag)
+        target_ps = calculate_targetkurs_ps(bolag)
+        targets = [t for t in [target_pe, target_ps] if t > 0]
+        if not targets or nuvarande_kurs <= 0:
             return 0
+        max_target = max(targets)
+        undervardering = (max_target - nuvarande_kurs) / max_target * 100
+        return round(undervardering, 2)
     except Exception:
         return 0
