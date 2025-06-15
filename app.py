@@ -13,6 +13,14 @@ if "all_data" not in st.session_state:
 if "selected_company" not in st.session_state:
     st.session_state["selected_company"] = None
 
+# Nyckel för undervärderade bolag som vi bläddrar bland
+if "undervarderade_list" not in st.session_state:
+    st.session_state["undervarderade_list"] = []
+
+# Index för bläddring
+if "current_index" not in st.session_state:
+    st.session_state["current_index"] = 0
+
 st.header("Lägg till nytt bolag")
 nytt_bolag = input_form()
 if nytt_bolag:
@@ -42,18 +50,44 @@ if st.session_state["all_data"]:
 else:
     st.info("Inga bolag sparade än.")
 
-if st.session_state["selected_company"]:
-    bolag = next((b for b in st.session_state["all_data"] if b["bolagsnamn"] == st.session_state["selected_company"]), None)
-    if bolag:
-        st.subheader(f"Data för {bolag['bolagsnamn']}")
-
-        st.write(f"🎯 Targetkurs P/E i år: {calculate_targetkurs_pe(bolag, nästa=False):.2f} kr")
-        st.write(f"🎯 Targetkurs P/E nästa år: {calculate_targetkurs_pe(bolag, nästa=True):.2f} kr")
-        st.write(f"🎯 Targetkurs P/S i år: {calculate_targetkurs_ps(bolag, nästa=False):.2f} kr")
-        st.write(f"🎯 Targetkurs P/S nästa år: {calculate_targetkurs_ps(bolag, nästa=True):.2f} kr")
-
+# Funktion för att uppdatera listan med undervärderade bolag, sorterade mest undervärderade först
+def update_undervarderade():
+    undervarderade = []
+    for bolag in st.session_state["all_data"]:
         undervardering = calculate_undervardering(bolag)
-        st.write(f"📉 Undervärdering: {undervardering:.2f} %")
+        if undervardering > 0:  # Endast undervärderade bolag
+            # Lägg till undervärdering som nyckel för enklare sortering
+            bolag["undervardering_pct"] = undervardering
+            undervarderade.append(bolag)
+    # Sortera i fallande ordning (mest undervärderad först)
+    undervarderade.sort(key=lambda x: x["undervardering_pct"], reverse=True)
+    st.session_state["undervarderade_list"] = undervarderade
+    st.session_state["current_index"] = 0  # Återställ index
 
-        rabatt_30 = calculate_targetkurs_pe(bolag) * 0.7
-        st.write(f"💡 Köpvärd vid 30% rabatt: {rabatt_30:.2f} kr")
+if st.button("Uppdatera lista med undervärderade bolag"):
+    update_undervarderade()
+
+if st.session_state["undervarderade_list"]:
+    bolag = st.session_state["undervarderade_list"][st.session_state["current_index"]]
+
+    st.subheader(f"Undervärderat bolag #{st.session_state['current_index'] + 1} av {len(st.session_state['undervarderade_list'])}")
+    st.write(f"**Bolagsnamn:** {bolag['bolagsnamn']}")
+    st.write(f"🎯 Targetkurs P/E i år: {calculate_targetkurs_pe(bolag, nästa=False):.2f} kr")
+    st.write(f"🎯 Targetkurs P/E nästa år: {calculate_targetkurs_pe(bolag, nästa=True):.2f} kr")
+    st.write(f"🎯 Targetkurs P/S i år: {calculate_targetkurs_ps(bolag, nästa=False):.2f} kr")
+    st.write(f"🎯 Targetkurs P/S nästa år: {calculate_targetkurs_ps(bolag, nästa=True):.2f} kr")
+    st.write(f"📉 Undervärdering: {bolag['undervardering_pct']:.2f} %")
+    rabatt_30 = calculate_targetkurs_pe(bolag) * 0.7
+    st.write(f"💡 Köpvärd vid 30% rabatt: {rabatt_30:.2f} kr")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅️ Föregående"):
+            if st.session_state["current_index"] > 0:
+                st.session_state["current_index"] -= 1
+    with col2:
+        if st.button("➡️ Nästa"):
+            if st.session_state["current_index"] < len(st.session_state["undervarderade_list"]) - 1:
+                st.session_state["current_index"] += 1
+else:
+    st.info("Inga undervärderade bolag i listan. Klicka på 'Uppdatera lista med undervärderade bolag' för att söka.")
