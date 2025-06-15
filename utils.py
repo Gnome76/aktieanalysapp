@@ -1,76 +1,66 @@
+def safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
 def calculate_targetkurs_pe(bolag, nästa=False):
     """
-    Beräknar targetkurs baserat på P/E för i år (nästa=False) eller nästa år (nästa=True).
-    Snittar P/E 1-4 och multiplicerar med vinst i år eller nästa år.
+    Beräknar targetkurs baserat på P/E snitt och vinst.
+    Om nästa=True används vinst nästa år, annars årets vinst.
+    P/E tas som snitt av pe1-pe4.
     """
-    try:
-        pe_values = [float(bolag.get(f"pe{i}", 0)) for i in range(1,5)]
-        pe_values = [v for v in pe_values if v > 0]
-        if not pe_values:
-            return 0
-        snitt_pe = sum(pe_values) / len(pe_values)
+    vinst_key = "vinst_nastaar" if nästa else "vinst_i_ar"
+    vinst = safe_float(bolag.get(vinst_key))
+    pe_list = [safe_float(bolag.get(f"pe{i}")) for i in range(1, 5)]
+    pe_list = [pe for pe in pe_list if pe > 0]
 
-        if nästa:
-            vinst = float(bolag.get("vinst_nastaar", 0))
-        else:
-            vinst = float(bolag.get("vinst_i_ar", 0))
+    if vinst > 0 and pe_list:
+        pe_avg = sum(pe_list) / len(pe_list)
+        return vinst * pe_avg
+    return 0.0
 
-        if vinst <= 0:
-            return 0
-
-        targetkurs_pe = snitt_pe * vinst
-        return round(targetkurs_pe, 2)
-    except Exception:
-        return 0
-
-
-def calculate_targetkurs_ps(bolag):
+def calculate_targetkurs_ps(bolag, nästa=False):
     """
-    Beräknar targetkurs baserat på P/S:
-    - Snitt av P/S 1-4
-    - Dividerat med nuvarande P/S
-    - Multiplicerat med nuvarande kurs
-    - Multiplicerat med (1 + genomsnittlig omsättningstillväxt i år och nästa år)
+    Beräknar targetkurs baserat på P/S och omsättningstillväxt.
+    P/S tas som snitt av ps1-ps4.
+    Omsättningstillväxt i år och nästa år tas som decimal (t.ex. 0.19 för 19%).
+    Multipliceras med nuvarande p/s och nuvarande kurs.
+    Om nästa=True används omsättningstillväxt nästa år, annars i år.
     """
-    try:
-        ps_values = [float(bolag.get(f"ps{i}", 0)) for i in range(1,5)]
-        ps_values = [v for v in ps_values if v > 0]
-        if not ps_values:
-            return 0
+    ps_list = [safe_float(bolag.get(f"ps{i}")) for i in range(1, 5)]
+    ps_list = [ps for ps in ps_list if ps > 0]
+    nuvarande_ps = safe_float(bolag.get("nuvarande_ps"))
 
-        snitt_ps = sum(ps_values) / len(ps_values)
-        nuvarande_ps = float(bolag.get("nuvarande_ps", 0))
-        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
-        oms_tillvaxt_i_ar = float(bolag.get("omsattningstillvaxt_i_ar", 0))
-        oms_tillvaxt_nastaar = float(bolag.get("omsattningstillvaxt_nastaar", 0))
+    oms_tillvaxt_i_ar = safe_float(bolag.get("omsattningstillvaxt_i_ar"), 0) / 100
+    oms_tillvaxt_nastaar = safe_float(bolag.get("omsattningstillvaxt_nastaar"), 0) / 100
 
-        if nuvarande_ps <= 0 or nuvarande_kurs <= 0:
-            return 0
+    oms_tillvaxt = oms_tillvaxt_nastaar if nästa else oms_tillvaxt_i_ar
 
-        oms_tillvaxt = (oms_tillvaxt_i_ar + oms_tillvaxt_nastaar) / 200  # procentsats till decimal & snitt av två år
+    if nuvarande_ps <= 0 or not ps_list:
+        return 0.0
 
-        targetkurs_ps = nuvarande_kurs * (snitt_ps / nuvarande_ps) * (1 + oms_tillvaxt)
-        return round(targetkurs_ps, 2)
-    except Exception:
-        return 0
+    ps_avg = sum(ps_list) / len(ps_list)
 
+    nuvarande_kurs = safe_float(bolag.get("nuvarande_kurs"))
+
+    target = (ps_avg / nuvarande_ps) * (1 + oms_tillvaxt) * nuvarande_kurs
+    return target if target > 0 else 0.0
 
 def calculate_undervardering(bolag):
     """
-    Beräknar undervärdering i procent baserat på max av targetkurser P/E och P/S.
+    Beräknar undervärdering baserat på max av targetkurs P/E och P/S.
+    Returnerar procentuell undervärdering.
     """
-    try:
-        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
-        target_pe_i_ar = calculate_targetkurs_pe(bolag, nästa=False)
-        target_pe_nasta_ar = calculate_targetkurs_pe(bolag, nästa=True)
-        target_ps = calculate_targetkurs_ps(bolag)
+    nuvarande_kurs = safe_float(bolag.get("nuvarande_kurs"))
+    target_pe = calculate_targetkurs_pe(bolag)
+    target_ps = calculate_targetkurs_ps(bolag)
 
-        targets = [v for v in [target_pe_i_ar, target_pe_nasta_ar, target_ps] if v > 0]
-        if not targets or nuvarande_kurs <= 0:
-            return 0
+    targets = [t for t in [target_pe, target_ps] if t > 0]
 
-        max_target = max(targets)
-        undervardering = (max_target - nuvarande_kurs) / max_target * 100
-        return round(undervardering, 2)
-    except Exception:
-        return 0
+    if not targets or nuvarande_kurs <= 0:
+        return 0.0
+
+    max_target = max(targets)
+    undervardering = (max_target - nuvarande_kurs) / max_target * 100
+    return round(undervardering, 2)
