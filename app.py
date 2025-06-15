@@ -20,9 +20,18 @@ def spara_data(df):
         json.dump(df.to_dict(orient="records"), f, ensure_ascii=False, indent=2)
 
 def berakna_target_och_undervardering(df):
-    for col in ["vinst_nasta_ar", "pe_1", "pe_2", "kurs", "ps_1", "ps_2"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    if df.empty:
+        return df
+
+    kolumner = [
+        "vinst_nasta_ar", "pe_1", "pe_2", "kurs", "ps_1", "ps_2"
+    ]
+    for kol in kolumner:
+        if kol not in df.columns:
+            df[kol] = pd.NA
+
+    for kol in kolumner:
+        df[kol] = pd.to_numeric(df[kol], errors="coerce")
 
     df["targetkurs_pe"] = df["vinst_nasta_ar"] * ((df["pe_1"] + df["pe_2"]) / 2)
     df["targetkurs_ps"] = ((df["ps_1"] + df["ps_2"]) / 2) * df["kurs"]
@@ -33,6 +42,7 @@ def berakna_target_och_undervardering(df):
     df["undervardering"] = pd.concat([underv_pe, underv_ps], axis=1).max(axis=1)
     df["undervardering"] = df["undervardering"].fillna(0)
     df.loc[df["undervardering"] < 0, "undervardering"] = 0
+
     return df
 
 def visa_undervarderade(df):
@@ -152,51 +162,28 @@ def bolagsform(df):
             "ps_4": ps_4,
         }
 
-        if bolagsnamn in df["bolagsnamn"].values:
-            df.loc[df["bolagsnamn"] == bolagsnamn, :] = pd.Series(ny_rad)
-        else:
+        # Uppdatera eller lägg till
+        if valt_bolag == "-- Nytt bolag --":
             df = pd.concat([df, pd.DataFrame([ny_rad])], ignore_index=True)
-        spara_data(df)
-        st.success(f"Bolaget '{bolagsnamn}' sparades.")
-        # Nollställ index för bläddring
-        st.session_state.idx = 0
-    return df
+        else:
+            idx = df.index[df["bolagsnamn"] == valt_bolag][0]
+            df.loc[idx] = ny_rad
 
-def ta_bort_bolag(df):
-    st.subheader("Ta bort bolag")
-    if df.empty:
-        st.info("Inga bolag att ta bort.")
-        return df
-    valt = st.selectbox("Välj bolag att ta bort", df["bolagsnamn"].tolist())
-    if st.button("Ta bort valt bolag"):
-        df = df[df["bolagsnamn"] != valt].reset_index(drop=True)
         spara_data(df)
-        st.success(f"Bolaget '{valt}' togs bort.")
-        st.session_state.idx = 0
-    return df
+        st.success(f"Bolaget '{bolagsnamn}' sparat!")
+        st.experimental_rerun()
 
-def visa_oversikt(df):
-    st.subheader("Översikt över alla bolag")
-    if df.empty:
-        st.info("Inga bolag inlagda.")
-        return
-    df_vis = df.copy()
-    st.dataframe(df_vis)
+    return df
 
 def main():
-    st.title("Aktieanalysapp med P/E och P/S")
+    st.title("Aktieanalysapp")
 
     df = las_data()
-
     df = berakna_target_och_undervardering(df)
-
-    visa_oversikt(df)
-
-    visa_undervarderade(df)
 
     df = bolagsform(df)
 
-    df = ta_bort_bolag(df)
+    visa_undervarderade(df)
 
 if __name__ == "__main__":
     main()
