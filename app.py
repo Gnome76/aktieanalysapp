@@ -1,6 +1,30 @@
 import streamlit as st
 import pandas as pd
 import json
+import os
+
+DATA_PATH = "aktier.json"
+
+def las_data():
+    if os.path.exists(DATA_PATH):
+        with open(DATA_PATH, "r") as f:
+            data = json.load(f)
+        return pd.DataFrame(data)
+    else:
+        return pd.DataFrame(columns=[
+            "bolagsnamn", "nuvarande_kurs", "vinst_forra_aret",
+            "vinst_i_ar", "vinst_nasta_ar", "oms_forra_aret",
+            "oms_tillv_i_ar", "oms_tillv_nasta_ar",
+            "pe_nu", "pe_1", "pe_2", "pe_3", "pe_4",
+            "ps_nu", "ps_1", "ps_2", "ps_3", "ps_4"
+        ])
+
+def spara_data(df):
+    with open(DATA_PATH, "w") as f:
+        f.write(df.to_json(orient="records", indent=4)) 
+import streamlit as st
+import pandas as pd
+import json
 from datetime import datetime
 import os
 
