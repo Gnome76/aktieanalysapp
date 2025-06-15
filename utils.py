@@ -1,47 +1,36 @@
-import datetime
+def berakna_targetkurs_pe(bolag):
+    # Targetkurs baserat på genomsnitt av pe_1 och pe_2 * vinst nästa år
+    pe1 = bolag.get("pe_1", 0)
+    pe2 = bolag.get("pe_2", 0)
+    vinst_nastaar = bolag.get("vinst_nastaar", 0)
+    if pe1 and pe2 and vinst_nastaar:
+        target_pe = vinst_nastaar * ((pe1 + pe2) / 2)
+        return round(target_pe, 2)
+    return None
 
-def calculate_targetkurs_pe(bolag):
-    # targetkurs_pe = vinst_nastaar * ((pe1 + pe2) / 2)
-    try:
-        vinst_nastaar = float(bolag.get("vinst_nastaar", 0))
-        pe1 = float(bolag.get("pe1", 0))
-        pe2 = float(bolag.get("pe2", 0))
-        return round(vinst_nastaar * ((pe1 + pe2) / 2), 2)
-    except Exception:
-        return 0.0
+def berakna_targetkurs_ps(bolag):
+    # Targetkurs baserat på genomsnitt P/S 1 och 2 * genomsnitt omsättningstillväxt * nuvarande kurs
+    ps1 = bolag.get("ps_1", 0)
+    ps2 = bolag.get("ps_2", 0)
+    omsattningstillvaxt_aret = bolag.get("omsattningstillvaxt_aret", 0)
+    omsattningstillvaxt_nastaar = bolag.get("omsattningstillvaxt_nastaar", 0)
+    nuvarande_kurs = bolag.get("nuvarande_kurs", 0)
+    if ps1 and ps2 and nuvarande_kurs:
+        oms_tillvaxt_genomsnitt = (omsattningstillvaxt_aret + omsattningstillvaxt_nastaar) / 2 / 100  # från % till decimal
+        target_ps = ((ps1 + ps2) / 2) * (1 + oms_tillvaxt_genomsnitt) * nuvarande_kurs
+        return round(target_ps, 2)
+    return None
 
-def calculate_targetkurs_ps(bolag):
-    # targetkurs_ps = medel av ps1 och ps2 * genomsnitt omsättningstillväxt * nuvarande kurs
-    try:
-        ps1 = float(bolag.get("ps1", 0))
-        ps2 = float(bolag.get("ps2", 0))
-        omsattningstillvaxt1 = float(bolag.get("omsattningstillvaxt1", 0)) / 100
-        omsattningstillvaxt2 = float(bolag.get("omsattningstillvaxt2", 0)) / 100
-        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
-        medel_ps = (ps1 + ps2) / 2
-        medel_omsattningstillvaxt = (omsattningstillvaxt1 + omsattningstillvaxt2) / 2
-        return round(medel_ps * medel_omsattningstillvaxt * nuvarande_kurs, 2)
-    except Exception:
-        return 0.0
+def berakna_undervardering(bolag):
+    nuvarande_kurs = bolag.get("nuvarande_kurs", 0)
+    target_pe = berakna_targetkurs_pe(bolag)
+    target_ps = berakna_targetkurs_ps(bolag)
 
-def calculate_undervardering(bolag):
-    try:
-        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
-        target_pe = calculate_targetkurs_pe(bolag)
-        target_ps = calculate_targetkurs_ps(bolag)
+    undervardering_pe = ((target_pe - nuvarande_kurs) / target_pe) * 100 if target_pe else None
+    undervardering_ps = ((target_ps - nuvarande_kurs) / target_ps) * 100 if target_ps else None
 
-        undervarde_pe = 0.0
-        undervarde_ps = 0.0
-        if target_pe > 0:
-            undervarde_pe = (target_pe - nuvarande_kurs) / target_pe
-        if target_ps > 0:
-            undervarde_ps = (target_ps - nuvarande_kurs) / target_ps
-
-        # Returnera största undervärdering (i procent)
-        undervarde = max(undvarde_pe, undervarde_ps) * 100
-        return round(undervarde, 2)
-    except Exception:
-        return 0.0
-
-def get_current_date_str():
-    return datetime.datetime.now().strftime("%Y-%m-%d")
+    # Returnera största undervärdering
+    undervarderingar = [u for u in [undervardering_pe, undervardering_ps] if u is not None]
+    if undervarderingar:
+        return round(max(undervarderingar), 2)
+    return None
