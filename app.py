@@ -5,78 +5,59 @@ from utils import calculate_targetkurs_pe, calculate_targetkurs_ps, calculate_un
 
 st.set_page_config(page_title="Aktieanalysapp", layout="wide")
 
-if "all_data" not in st.session_state:
-    st.session_state["all_data"] = load_data()
+# Initiera all_data i session_state som en lista — alltid!
+if "all_data" not in st.session_state or not isinstance(st.session_state["all_data"], list):
+    data = load_data()
+    if not isinstance(data, list):
+        data = []
+    st.session_state["all_data"] = data
 
 st.title("Aktieanalysapp - Översikt och analys")
 
-st.header("Lägg till nytt bolag")
-
+# Visa formulär för att lägga till nytt bolag
 nytt_bolag = input_form()
 if nytt_bolag is not None:
     st.session_state["all_data"].append(nytt_bolag)
     save_data(st.session_state["all_data"])
     st.success(f"Bolag '{nytt_bolag['bolagsnamn']}' tillagt!")
 
-st.header("Redigera bolag")
+# Om inga bolag finns, visa meddelande och stoppa
+if not st.session_state["all_data"]:
+    st.info("Inga bolag sparade ännu.")
+    st.stop()
 
-if st.session_state["all_data"]:
-    bolag_namn_lista = [d["bolagsnamn"] for d in st.session_state["all_data"]]
-    valt_bolag = st.selectbox("Välj bolag att redigera", bolag_namn_lista)
+# Välj bolag att redigera
+bolagsnamn_lista = [bolag["bolagsnamn"] for bolag in st.session_state["all_data"]]
+valt_bolag = st.selectbox("Välj bolag att redigera", bolagsnamn_lista)
 
-    if valt_bolag:
-        index = bolag_namn_lista.index(valt_bolag)
-        redigerat_bolag = edit_form(st.session_state["all_data"][index])
-        if redigerat_bolag is not None:
-            st.session_state["all_data"][index] = redigerat_bolag
+if valt_bolag:
+    # Hitta bolaget i listan
+    bolag_data = next((b for b in st.session_state["all_data"] if b["bolagsnamn"] == valt_bolag), None)
+    if bolag_data:
+        uppdaterat_bolag = edit_form(bolag_data)
+        if uppdaterat_bolag is not None:
+            # Uppdatera listan i session_state
+            index = st.session_state["all_data"].index(bolag_data)
+            st.session_state["all_data"][index] = uppdaterat_bolag
             save_data(st.session_state["all_data"])
             st.success(f"Bolag '{valt_bolag}' uppdaterat!")
-else:
-    st.info("Inga bolag att redigera.")
 
-st.header("Alla sparade bolag")
+st.header("Sparade bolag och analys")
 
-if st.session_state["all_data"]:
-    for bolag in st.session_state["all_data"]:
-        st.write(f"- **{bolag['bolagsnamn']}**")
-    bolag_att_ta_bort = st.selectbox("Välj bolag att ta bort", [d["bolagsnamn"] for d in st.session_state["all_data"]])
-    if st.button("Ta bort valt bolag"):
-        delete_company(bolag_att_ta_bort, st.session_state["all_data"])
-        save_data(st.session_state["all_data"])
+# Sortera bolag baserat på undervärdering (exempel)
+visa_data = st.session_state["all_data"].copy()
+visa_data.sort(key=calculate_undervardering, reverse=True)
+
+for bolag in visa_data:
+    st.subheader(bolag["bolagsnamn"])
+    target_pe = calculate_targetkurs_pe(bolag)
+    target_ps = calculate_targetkurs_ps(bolag)
+    underv = calculate_undervardering(bolag)
+    st.write(f"Nuvarande kurs: {bolag['nuvarande_kurs']}")
+    st.write(f"Targetkurs P/E: {target_pe:.2f}")
+    st.write(f"Targetkurs P/S: {target_ps:.2f}")
+    st.write(f"Undervärdering: {underv:.2f}%")
+
+    if st.button(f"Ta bort {bolag['bolagsnamn']}"):
+        st.session_state["all_data"] = delete_company(st.session_state["all_data"], bolag["bolagsnamn"])
         st.experimental_rerun()
-else:
-    st.info("Inga bolag sparade ännu.")
-
-st.header("Undervärderade bolag")
-
-visa_undervarderade_endast = st.checkbox("Visa endast bolag med minst 30% undervärdering", value=True)
-
-def sort_key(b):
-    return max(
-        calculate_undervardering(b, metod="pe"),
-        calculate_undervardering(b, metod="ps")
-    )
-
-if st.session_state["all_data"]:
-    if visa_undervarderade_endast:
-        visa_data = [b for b in st.session_state["all_data"] if max(calculate_undervardering(b, metod="pe"), calculate_undervardering(b, metod="ps")) >= 30]
-    else:
-        visa_data = st.session_state["all_data"].copy()
-
-    visa_data.sort(key=sort_key, reverse=True)
-
-    for bolag in visa_data:
-        target_pe = calculate_targetkurs_pe(bolag)
-        target_ps = calculate_targetkurs_ps(bolag)
-        undervardering_pe = calculate_undervardering(bolag, metod="pe")
-        undervardering_ps = calculate_undervardering(bolag, metod="ps")
-
-        st.subheader(bolag["bolagsnamn"])
-        st.write(f"Nuvarande kurs: {bolag['nuvarande_kurs']:.2f} kr")
-        st.write(f"Targetkurs P/E: {target_pe:.2f} kr")
-        st.write(f"Targetkurs P/S: {target_ps:.2f} kr")
-        st.write(f"Undervärdering P/E: {undervardering_pe:.1f} %")
-        st.write(f"Undervärdering P/S: {undervardering_ps:.1f} %")
-        st.write("---")
-else:
-    st.info("Inga bolag att visa.")
