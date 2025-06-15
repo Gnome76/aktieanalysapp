@@ -1,50 +1,61 @@
 import streamlit as st
 from forms import input_form, edit_form
-from utils import (
-    calculate_targetkurs_pe,
-    calculate_targetkurs_ps,
-    calculate_undervardering,
-)
+from utils import calculate_targetkurs_pe, calculate_targetkurs_ps, calculate_undervardering
 from data_handler import load_data, save_data, delete_company
 
 st.set_page_config(page_title="Aktieanalysapp", layout="wide")
 
-# Ladda data från fil eller initiera tom lista i session_state
+# Initiera session state för data om det inte finns
 if "all_data" not in st.session_state:
-    st.session_state["all_data"] = load_data()
+    st.session_state["all_data"] = load_data()  # Ladda data från JSON eller tom lista
 
-# Lägg till nytt bolag via inputformulär
+st.header("Lägg till nytt bolag")
+
 nytt_bolag = input_form()
 if nytt_bolag:
-    st.session_state["all_data"].append(nytt_bolag)
-    save_data(st.session_state["all_data"])
-    st.success(f"Bolaget {nytt_bolag['bolagsnamn']} är tillagt!")
+    # Kontrollera om bolag redan finns (baserat på namn)
+    existerande = next((b for b in st.session_state["all_data"] if b["bolagsnamn"].lower() == nytt_bolag["bolagsnamn"].lower()), None)
+    if existerande:
+        st.warning(f"Bolaget '{nytt_bolag['bolagsnamn']}' finns redan.")
+    else:
+        st.session_state["all_data"].append(nytt_bolag)
+        save_data(st.session_state["all_data"])
+        st.success(f"Bolaget '{nytt_bolag['bolagsnamn']}' tillagt.")
 
-# Sortera bolag baserat på undervärdering (störst först)
-visa_data = st.session_state["all_data"]
-visa_data.sort(key=calculate_undervardering, reverse=True)
+if st.session_state["all_data"]:
+    st.header("Redigera befintligt bolag")
 
-# Välj bolag att redigera
-valda_bolag_namn = [bolag["bolagsnamn"] for bolag in visa_data]
-valt_bolag = st.selectbox("Välj bolag att redigera", [""] + valda_bolag_namn)
+    bolagslista = [b["bolagsnamn"] for b in st.session_state["all_data"]]
+    valt_bolag_namn = st.selectbox("Välj bolag att redigera", bolagslista)
 
-if valt_bolag:
-    bolag = next(b for b in visa_data if b["bolagsnamn"] == valt_bolag)
-    st.write(f"Nuvarande kurs: {bolag['nuvarande_kurs']}")
+    bolag = next(b for b in st.session_state["all_data"] if b["bolagsnamn"] == valt_bolag_namn)
+
     uppdaterat_bolag = edit_form(bolag)
     if uppdaterat_bolag:
-        index = visa_data.index(bolag)
+        # Uppdatera bolaget i session_state
+        index = st.session_state["all_data"].index(bolag)
         st.session_state["all_data"][index] = uppdaterat_bolag
         save_data(st.session_state["all_data"])
-        st.success(f"Bolaget {valt_bolag} är uppdaterat!")
+        st.success(f"Bolaget '{uppdaterat_bolag['bolagsnamn']}' uppdaterat.")
 
-st.subheader("Alla bolag")
-st.table(visa_data)
+if st.session_state["all_data"]:
+    st.header("Alla sparade bolag")
+    for bolag in st.session_state["all_data"]:
+        st.subheader(bolag["bolagsnamn"])
+        kurs = bolag.get("nuvarande_kurs", 0.0)
+        target_pe = calculate_targetkurs_pe(bolag)
+        target_ps = calculate_targetkurs_ps(bolag)
+        undervardering = calculate_undervardering(kurs, target_pe, target_ps)
 
-ta_bort_bolag = st.selectbox("Välj bolag att ta bort", [""] + valda_bolag_namn, key="remove_selectbox")
-if ta_bort_bolag:
-    if st.button(f"Ta bort {ta_bort_bolag}"):
-        st.session_state["all_data"] = delete_company(st.session_state["all_data"], ta_bort_bolag)
-        save_data(st.session_state["all_data"])
-        st.success(f"Bolaget {ta_bort_bolag} är borttaget!")
-        st.experimental_rerun()
+        st.write(f"Nuvarande kurs: {kurs:.2f}")
+        st.write(f"Targetkurs P/E: {target_pe:.2f}")
+        st.write(f"Targetkurs P/S: {target_ps:.2f}")
+        st.write(f"Undervärdering (%): {undervardering:.2f}")
+
+        # Knapp för att ta bort bolaget
+        if st.button(f"Ta bort {bolag['bolagsnamn']}"):
+            st.session_state["all_data"] = delete_company(st.session_state["all_data"], bolag["bolagsnamn"])
+            save_data(st.session_state["all_data"])
+            st.experimental_rerun()
+else:
+    st.info("Inga bolag sparade ännu.")
