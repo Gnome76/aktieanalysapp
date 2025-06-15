@@ -1,54 +1,38 @@
-# utils.py
-
-def berakna_targetkurs_pe(vinst_nastaar, pe1, pe2):
-    """
-    Beräkna targetkurs baserat på P/E.
-    Targetkurs = Vinst nästa år * medelvärde av PE1 och PE2
-    """
+def calculate_targetkurs_pe(bolag):
     try:
-        pe_medel = (float(pe1) + float(pe2)) / 2
-        targetkurs_pe = float(vinst_nastaar) * pe_medel
-        return round(targetkurs_pe, 2)
-    except (TypeError, ValueError):
-        return None
-
-
-def berakna_targetkurs_ps(nuvarande_ps, ps1, ps2, omsattningstillvaxt1, omsattningstillvaxt2, nuvarande_kurs):
-    """
-    Beräkna targetkurs baserat på P/S.
-    Targetkurs = medelvärde av P/S år 1 och 2 * medelvärde av omsättningstillväxt år 1 och 2 * nuvarande kurs
-    """
-    try:
-        ps_medel = (float(ps1) + float(ps2)) / 2
-        oms_tillv_medel = (float(omsattningstillvaxt1) + float(omsattningstillvaxt2)) / 2 / 100
-        targetkurs_ps = ps_medel * (1 + oms_tillv_medel) * float(nuvarande_kurs)
-        return round(targetkurs_ps, 2)
-    except (TypeError, ValueError):
-        return None
-
-
-def berakna_undervardering(nuvarande_kurs, targetkurs_pe, targetkurs_ps):
-    """
-    Beräkna undervärdering i procent baserat på nuvarande kurs och targetkurser.
-    Returnerar den högsta undervärderingen av P/E eller P/S i procent.
-    """
-    undervarderinger = []
-
-    try:
-        if targetkurs_pe and targetkurs_pe > 0:
-            undervardering_pe = (targetkurs_pe - float(nuvarande_kurs)) / targetkurs_pe * 100
-            undervarderinger.append(undervardering_pe)
-    except (TypeError, ValueError):
+        vinst = float(bolag.get("vinst_nastaar", 0))
+        pe1 = float(bolag.get("pe1", 0))
+        pe2 = float(bolag.get("pe2", 0))
+        if vinst > 0 and pe1 > 0 and pe2 > 0:
+            return vinst * ((pe1 + pe2) / 2)
+    except Exception:
         pass
+    return 0
 
+def calculate_targetkurs_ps(bolag):
     try:
-        if targetkurs_ps and targetkurs_ps > 0:
-            undervardering_ps = (targetkurs_ps - float(nuvarande_kurs)) / targetkurs_ps * 100
-            undervarderinger.append(undervardering_ps)
-    except (TypeError, ValueError):
+        ps1 = float(bolag.get("ps1", 0))
+        ps2 = float(bolag.get("ps2", 0))
+        oms_tillvaxt_i_ar = float(bolag.get("omsattningstillvaxt_i_ar", 0))
+        oms_tillvaxt_nastaar = float(bolag.get("omsattningstillvaxt_nastaar", 0))
+        oms_tillvaxt = (oms_tillvaxt_i_ar + oms_tillvaxt_nastaar) / 2 / 100  # procentsats till decimal
+        if ps1 > 0 and ps2 > 0:
+            avg_ps = (ps1 + ps2) / 2
+            return avg_ps * (1 + oms_tillvaxt)
+    except Exception:
         pass
+    return 0
 
-    if undervarderinger:
-        return round(max(undervarderinger), 2)
-    else:
-        return None
+def calculate_undervardering(bolag):
+    try:
+        nuvarande_kurs = float(bolag.get("nuvarande_kurs", 0))
+        target_pe = calculate_targetkurs_pe(bolag)
+        target_ps = calculate_targetkurs_ps(bolag)
+        targets = [t for t in [target_pe, target_ps] if t > 0]
+        if not targets or nuvarande_kurs <= 0:
+            return 0
+        max_target = max(targets)
+        undervardering = (max_target - nuvarande_kurs) / max_target * 100
+        return round(undervardering, 2)
+    except Exception:
+        return 0
