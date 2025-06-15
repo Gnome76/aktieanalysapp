@@ -1,40 +1,53 @@
-# data_handler.py
 import json
 import os
 
 DATA_FILE = "bolag_data.json"
 
+# Lista på alla nycklar som varje bolag ska ha med standardvärden
+REQUIRED_KEYS = {
+    "bolagsnamn": "",
+    "nuvarande_kurs": 0.0,
+    "vinst_forra_aret": 0.0,
+    "vinst_i_ar": 0.0,
+    "vinst_nastaar": 0.0,
+    "omsattning_forra_aret": 0.0,
+    "omsattningstillvaxt_i_ar": 0.0,
+    "omsattningstillvaxt_nastaar": 0.0,
+    "nuvarande_pe": 0.0,
+    "pe1": 0.0,
+    "pe2": 0.0,
+    "pe3": 0.0,
+    "pe4": 0.0,
+    "nuvarande_ps": 0.0,
+    "ps1": 0.0,
+    "ps2": 0.0,
+    "ps3": 0.0,
+    "ps4": 0.0,
+    "insatt_datum": "",
+    "senast_andrad": "",
+}
+
+def validate_bolag_data(bolag):
+    # Se till att alla nycklar finns, annars lägg till standardvärde
+    for key, default in REQUIRED_KEYS.items():
+        if key not in bolag:
+            bolag[key] = default
+    return bolag
+
 def load_data():
-    """
-    Läser in data från JSON-fil.
-    Returnerar en lista med bolag (tom lista om fil inte finns).
-    """
     if not os.path.exists(DATA_FILE):
         return []
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return data
-            else:
-                return []
-    except (json.JSONDecodeError, IOError):
-        return []
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        # Validera varje bolag
+        data = [validate_bolag_data(b) for b in data]
+        return data
 
 def save_data(data):
-    """
-    Sparar data (lista med bolag) till JSON-fil.
-    """
-    try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-    except IOError as e:
-        print(f"Fel vid sparande av data: {e}")
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 def delete_company(data, bolagsnamn):
-    """
-    Tar bort bolag med angivet bolagsnamn från data.
-    Returnerar uppdaterad lista.
-    """
-    ny_data = [bolag for bolag in data if bolag.get("bolagsnamn") != bolagsnamn]
-    return ny_data
+    new_data = [b for b in data if b["bolagsnamn"] != bolagsnamn]
+    save_data(new_data)
+    return new_data
