@@ -1,38 +1,40 @@
+# data_handler.py
 import json
 import os
 
 DATA_FILE = "bolag_data.json"
 
 def load_data():
-    if os.path.exists(DATA_FILE):
+    """
+    Läser in data från JSON-fil.
+    Returnerar en lista med bolag (tom lista om fil inte finns).
+    """
+    if not os.path.exists(DATA_FILE):
+        return []
+    try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            else:
                 return []
-    return []
+    except (json.JSONDecodeError, IOError):
+        return []
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-def add_company(data, nytt_bolag):
-    data.append(nytt_bolag)
-    save_data(data)
-    return data
-
-def update_company(data, uppdaterat_bolag):
-    for idx, bolag in enumerate(data):
-        if bolag["bolagsnamn"] == uppdaterat_bolag["bolagsnamn"]:
-            data[idx] = uppdaterat_bolag
-            save_data(data)
-            return data
-    # Om ej finns, lägg till
-    data.append(uppdaterat_bolag)
-    save_data(data)
-    return data
+    """
+    Sparar data (lista med bolag) till JSON-fil.
+    """
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except IOError as e:
+        print(f"Fel vid sparande av data: {e}")
 
 def delete_company(data, bolagsnamn):
-    data = [b for b in data if b["bolagsnamn"] != bolagsnamn]
-    save_data(data)
-    return data
+    """
+    Tar bort bolag med angivet bolagsnamn från data.
+    Returnerar uppdaterad lista.
+    """
+    ny_data = [bolag for bolag in data if bolag.get("bolagsnamn") != bolagsnamn]
+    return ny_data
