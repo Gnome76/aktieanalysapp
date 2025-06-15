@@ -1,36 +1,54 @@
-def berakna_targetkurs_pe(bolag):
-    # Targetkurs baserat på genomsnitt av pe_1 och pe_2 * vinst nästa år
-    pe1 = bolag.get("pe_1", 0)
-    pe2 = bolag.get("pe_2", 0)
-    vinst_nastaar = bolag.get("vinst_nastaar", 0)
-    if pe1 and pe2 and vinst_nastaar:
-        target_pe = vinst_nastaar * ((pe1 + pe2) / 2)
-        return round(target_pe, 2)
-    return None
+# utils.py
 
-def berakna_targetkurs_ps(bolag):
-    # Targetkurs baserat på genomsnitt P/S 1 och 2 * genomsnitt omsättningstillväxt * nuvarande kurs
-    ps1 = bolag.get("ps_1", 0)
-    ps2 = bolag.get("ps_2", 0)
-    omsattningstillvaxt_aret = bolag.get("omsattningstillvaxt_aret", 0)
-    omsattningstillvaxt_nastaar = bolag.get("omsattningstillvaxt_nastaar", 0)
-    nuvarande_kurs = bolag.get("nuvarande_kurs", 0)
-    if ps1 and ps2 and nuvarande_kurs:
-        oms_tillvaxt_genomsnitt = (omsattningstillvaxt_aret + omsattningstillvaxt_nastaar) / 2 / 100  # från % till decimal
-        target_ps = ((ps1 + ps2) / 2) * (1 + oms_tillvaxt_genomsnitt) * nuvarande_kurs
-        return round(target_ps, 2)
-    return None
+def berakna_targetkurs_pe(vinst_nastaar, pe1, pe2):
+    """
+    Beräkna targetkurs baserat på P/E.
+    Targetkurs = Vinst nästa år * medelvärde av PE1 och PE2
+    """
+    try:
+        pe_medel = (float(pe1) + float(pe2)) / 2
+        targetkurs_pe = float(vinst_nastaar) * pe_medel
+        return round(targetkurs_pe, 2)
+    except (TypeError, ValueError):
+        return None
 
-def berakna_undervardering(bolag):
-    nuvarande_kurs = bolag.get("nuvarande_kurs", 0)
-    target_pe = berakna_targetkurs_pe(bolag)
-    target_ps = berakna_targetkurs_ps(bolag)
 
-    undervardering_pe = ((target_pe - nuvarande_kurs) / target_pe) * 100 if target_pe else None
-    undervardering_ps = ((target_ps - nuvarande_kurs) / target_ps) * 100 if target_ps else None
+def berakna_targetkurs_ps(nuvarande_ps, ps1, ps2, omsattningstillvaxt1, omsattningstillvaxt2, nuvarande_kurs):
+    """
+    Beräkna targetkurs baserat på P/S.
+    Targetkurs = medelvärde av P/S år 1 och 2 * medelvärde av omsättningstillväxt år 1 och 2 * nuvarande kurs
+    """
+    try:
+        ps_medel = (float(ps1) + float(ps2)) / 2
+        oms_tillv_medel = (float(omsattningstillvaxt1) + float(omsattningstillvaxt2)) / 2 / 100
+        targetkurs_ps = ps_medel * (1 + oms_tillv_medel) * float(nuvarande_kurs)
+        return round(targetkurs_ps, 2)
+    except (TypeError, ValueError):
+        return None
 
-    # Returnera största undervärdering
-    undervarderingar = [u for u in [undervardering_pe, undervardering_ps] if u is not None]
-    if undervarderingar:
-        return round(max(undervarderingar), 2)
-    return None
+
+def berakna_undervardering(nuvarande_kurs, targetkurs_pe, targetkurs_ps):
+    """
+    Beräkna undervärdering i procent baserat på nuvarande kurs och targetkurser.
+    Returnerar den högsta undervärderingen av P/E eller P/S i procent.
+    """
+    undervarderinger = []
+
+    try:
+        if targetkurs_pe and targetkurs_pe > 0:
+            undervardering_pe = (targetkurs_pe - float(nuvarande_kurs)) / targetkurs_pe * 100
+            undervarderinger.append(undervardering_pe)
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        if targetkurs_ps and targetkurs_ps > 0:
+            undervardering_ps = (targetkurs_ps - float(nuvarande_kurs)) / targetkurs_ps * 100
+            undervarderinger.append(undervardering_ps)
+    except (TypeError, ValueError):
+        pass
+
+    if undervarderinger:
+        return round(max(undervarderinger), 2)
+    else:
+        return None
