@@ -1,36 +1,43 @@
-import json
-import os
-
-DATAFIL = "data.json"
-
-def load_data():
-    if not os.path.exists(DATAFIL):
-        return []
+def calculate_targetkurs_pe(bolag):
     try:
-        with open(DATAFIL, "r", encoding="utf-8") as f:
-            return json.load(f)
+        vinst_nasta_aar = bolag.get("vinst_nasta_aar", 0)
+        pe1 = bolag.get("pe1", 0)
+        pe2 = bolag.get("pe2", 0)
+        if pe1 > 0 and pe2 > 0:
+            return vinst_nasta_aar * ((pe1 + pe2) / 2)
+        else:
+            return 0
     except Exception:
-        return []
+        return 0
 
-def save_data(data):
+
+def calculate_targetkurs_ps(bolag):
     try:
-        with open(DATAFIL, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        print(f"Fel vid sparande: {e}")
+        ps1 = bolag.get("ps1", 0)
+        ps2 = bolag.get("ps2", 0)
+        omsattningstillvxt_i_aar = bolag.get("omsattningstillvxt_i_aar", 0) / 100
+        omsattningstillvxt_nasta_aar = bolag.get("omsattningstillvxt_nasta_aar", 0) / 100
+        omsattningstillvxt_medel = (omsattningstillvxt_i_aar + omsattningstillvxt_nasta_aar) / 2
+        kurs = bolag.get("kurs", 0)
+        if ps1 > 0 and ps2 > 0:
+            medel_ps = (ps1 + ps2) / 2
+            return medel_ps * (1 + omsattningstillvxt_medel) * kurs
+        else:
+            return 0
+    except Exception:
+        return 0
 
-def calculate_targetkurs_pe(vinst_nastaar, pe1, pe2):
-    if None in (vinst_nastaar, pe1, pe2):
-        return None
-    return vinst_nastaar * ((pe1 + pe2) / 2)
 
-def calculate_targetkurs_ps(ps1, ps2, oms_tillv_1, oms_tillv_2, nuv_kurs):
-    if None in (ps1, ps2, oms_tillv_1, oms_tillv_2, nuv_kurs):
-        return None
-    oms_tillv_genomsnitt = (oms_tillv_1 + oms_tillv_2) / 2 / 100
-    return ((ps1 + ps2) / 2) * (1 + oms_tillv_genomsnitt) * nuv_kurs
-
-def calculate_undervardering(nuv_kurs, target_kurs):
-    if None in (nuv_kurs, target_kurs) or target_kurs == 0:
-        return None
-    return (target_kurs - nuv_kurs) / target_kurs * 100
+def calculate_undervardering(bolag):
+    try:
+        kurs = bolag.get("kurs", 0)
+        target_pe = bolag.get("targetkurs_pe", 0)
+        target_ps = bolag.get("targetkurs_ps", 0)
+        if target_pe > 0 and target_ps > 0:
+            undervardering_pe = max(0, (target_pe - kurs) / target_pe * 100)
+            undervardering_ps = max(0, (target_ps - kurs) / target_ps * 100)
+            return max(undervardering_pe, undervardering_ps)
+        else:
+            return 0
+    except Exception:
+        return 0
